@@ -1,0 +1,23 @@
+[Unit]
+Description=OCR Kataloogijälgimise Teenus (Qwen3.5-9B)
+After=network.target
+
+[Service]
+Type=simple
+User=mf
+WorkingDirectory=/home/mf/Dokumendid/LLM/qwen3.5
+Environment="PATH=/home/mf/Dokumendid/LLM/qwen3.5/venv/bin:/usr/local/bin:/usr/bin"
+ExecStart=/home/mf/Dokumendid/LLM/qwen3.5/venv/bin/python /home/mf/Dokumendid/LLM/qwen3.5/kataloogi-jalgimine-ja-ocr.py
+Restart=on-failure
+RestartSec=10
+
+# GPU ja mälu
+Nice=-5
+MemoryMax=90%
+
+# Logid (lisaks skripti oma logifailile ocr-service.log)
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

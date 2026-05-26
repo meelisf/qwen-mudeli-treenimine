@@ -1,0 +1,30 @@
+# Python
+venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+unsloth_compiled_cache/
+
+# Logid
+*.log
+
+# Treeninguandmed – pildid ja CSV-d (suured failid)
+data/lehekyljed/images/
+data/processed/images/
+data/vutt/images/
+data/vutt-raw/
+data/raw/
+data/*/images/
+
+# Treeninguandmed – CSV-d jäävad repposse (väikesed, kasulikud)
+# data/**/*.csv  <-- ei välista
+
+# Mudelicheckpointid ja treenitud mudelid
+models/
+!models/.gitkeep
+
+# Ajutised treenimisväljundid
+outputs*/
+
+# Süsteemifailid
+.DS_Store
