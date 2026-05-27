@@ -32,6 +32,7 @@ from unsloth import FastVisionModel
 from trl import SFTTrainer, SFTConfig
 from unsloth.trainer import UnslothVisionDataCollator
 from PIL import Image as PILImage
+from prompt import INSTRUCTION
 
 TEST_MODE = "--test" in sys.argv
 if TEST_MODE:
@@ -41,18 +42,17 @@ if TEST_MODE:
 # Konfid
 # ---------------------------------------------------------------------------
 
-# Etapp 1 checkpoint (baas)
-BASE_MODEL = "models/qwen3.5-ocr-lora"
+# Etapp 1 checkpoint (baas) – backup enne markup treeningut
+BASE_MODEL = "models/qwen3.5-ocr-lora-backup-20260527"
 for arg in sys.argv:
     if arg.startswith("--base="):
         BASE_MODEL = arg.split("=", 1)[1]
     elif arg == "--base" and sys.argv.index(arg) + 1 < len(sys.argv):
         BASE_MODEL = sys.argv[sys.argv.index(arg) + 1]
 
-# Andmeallikad (kasutatakse mõlemaid koos)
+# Andmeallikad – ainult VUTT märgendatud materjal
 DATA_SOURCES = [
-    {"csv": "data/processed/metadata.csv",  "images": "data/processed/images"},
-    {"csv": "data/vutt/metadata.csv",        "images": "data/vutt/images"},
+    {"csv": "data/vutt/metadata.csv", "images": "data/vutt/images"},
 ]
 
 # Kuupäevaga väljundkausta nimi
@@ -123,41 +123,6 @@ print("Mudel laaditud etapp 1 checkpoindist (LoRA adapterid juba küljes).")
 model.print_trainable_parameters()
 
 # ---------------------------------------------------------------------------
-# Instruktsioon
-# ---------------------------------------------------------------------------
-
-INSTRUCTION = """You are an expert OCR assistant for historical documents.
-
-Instructions:
-1. Transcribe the entire page from the provided image.
-2. Preserve original line breaks and hyphenation:
-   - Antiqua hyphenation: - (regular hyphen), e.g. coa-cervare
-   - Fraktur/Gothic hyphenation: \u2E17 (double hyphen), e.g. Ge\u2E17witter
-3. Do not translate; keep the original language (Latin, Greek, German, Estonian, etc.).
-4. Ligatures:
-   - \u00E6, \u00C6, \u0153, \u0152 \u2013 transcribe exactly as they are
-   - st, ff, fi, fl and other typographic ligatures \u2013 write out as separate letters
-5. Umlauts and diacritics:
-   - \u00F6, \u00E4, \u00FC, \u00F5 \u2013 always use modern form
-   - u\u0364, o\u0364, a\u0364 (letter + superscript e) \u2013 transcribe as \u00FC, \u00F6, \u00E4
-   - \u00E5, \u00C5 (Swedish) \u2013 keep as is
-   - \u0169, \u00F1, \u00F5 \u2013 keep as is (tilde preserved)
-6. Special characters:
-   - \u017F (long s) \u2013 transcribe as \u017F
-   - \u00DF (double s) \u2013 transcribe as \u00DF
-7. Abbreviations:
-   - que abbreviation (\uA757 etc.) \u2013 write as q;
-   - -us abbreviation (\uA770) \u2013 may be expanded
-8. Formatting:
-   - Italic text: *between asterisks*
-   - Bold text: **between double asterisks**
-   - Code-switching (Fraktur word in Antiqua text or vice versa): ~between tildes~
-9. Marginal notes: [[m: content of marginal note]]
-10. Signature marks (quire numbers): place at the very end, e.g. A 3
-11. Page breaks: if the image contains a double-page spread, mark the page break between pages with --lk--. Partial pages may occur \u2013 ignore the partial page and transcribe only where a full page is visible.
-
-Return only the exact transcription as plain text."""
-
 # ---------------------------------------------------------------------------
 # Andmestiku laadimine mitmest allikast
 # ---------------------------------------------------------------------------

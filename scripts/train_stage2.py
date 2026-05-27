@@ -32,6 +32,7 @@ from datasets import load_dataset
 from trl import SFTTrainer, SFTConfig
 from unsloth.trainer import UnslothVisionDataCollator
 from PIL import Image as PILImage
+from prompt import INSTRUCTION
 
 TEST_MODE = "--test" in sys.argv
 if TEST_MODE:
@@ -112,42 +113,6 @@ dataset = dataset.map(resolve_path)
 print(f"Andmestik laaditud: {len(dataset)} näidet.")
 
 # ---------------------------------------------------------------------------
-# Instruktsioon (sama mis etapp 1-s)
-# ---------------------------------------------------------------------------
-
-INSTRUCTION = """You are an expert OCR assistant for historical documents.
-
-Instructions:
-1. Transcribe the entire page from the provided image.
-2. Preserve original line breaks and hyphenation:
-   - Antiqua hyphenation: - (regular hyphen), e.g. coa-cervare
-   - Fraktur/Gothic hyphenation: \u2E17 (double hyphen), e.g. Ge\u2E17witter
-3. Do not translate; keep the original language (Latin, Greek, German, Estonian, etc.).
-4. Ligatures:
-   - \u00E6, \u00C6, \u0153, \u0152 \u2013 transcribe exactly as they are
-   - st, ff, fi, fl and other typographic ligatures \u2013 write out as separate letters
-5. Umlauts and diacritics:
-   - \u00F6, \u00E4, \u00FC, \u00F5 \u2013 always use modern form
-   - u\u0364, o\u0364, a\u0364 (letter + superscript e) \u2013 transcribe as \u00FC, \u00F6, \u00E4
-   - \u00E5, \u00C5 (Swedish) \u2013 keep as is
-   - \u0169, \u00F1, \u00F5 \u2013 keep as is (tilde preserved)
-6. Special characters:
-   - \u017F (long s) \u2013 transcribe as \u017F
-   - \u00DF (double s) \u2013 transcribe as \u00DF
-7. Abbreviations:
-   - que abbreviation (\uA757 etc.) \u2013 write as q;
-   - -us abbreviation (\uA770) \u2013 may be expanded
-8. Formatting:
-   - Italic text: *between asterisks*
-   - Bold text: **between double asterisks**
-   - Code-switching (Fraktur word in Antiqua text or vice versa): ~between tildes~
-9. Marginal notes: [[m: content of marginal note]]
-10. Signature marks (quire numbers): place at the very end, e.g. A 3
-11. Page breaks: if the image contains a double-page spread, mark the page break between pages with --lk--. Partial pages may occur \u2013 ignore the partial page and transcribe only where a full page is visible.
-
-Return only the exact transcription as plain text."""
-
-
 class LehekyljAndmestik:
     """Laisk laadimine: pildid loetakse mällu alles treenimise ajal."""
 
