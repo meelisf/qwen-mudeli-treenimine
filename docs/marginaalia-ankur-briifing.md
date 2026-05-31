@@ -4,7 +4,7 @@
 
 Me treenime Qwen 3.5-9B multimodaalset mudelit ajalooliste dokumentide transkribeerimiseks (VUTT projekt). Treeningandmed on pildid + referentstranskriptsioonid VUTT-i `.txt` failidest.
 
-Praegune transkriptsiooniformaat paneb ääremärkused (marginaaliad) **inline põhiteksti sisse**, iga marginaalia rida eraldi `<m>` tähisega:
+Praegune VUTTis kasutatav inimeste märgendatud transkriptsiooniformaat paneb ääremärkused (marginaaliad) **inline põhiteksti sisse**, iga marginaalia rida eraldi `<m>` tähisega:
 
 ```
 gleichfalls Exempeln / alß Zoroaſter, Moſes Cretenſis, Circe,
@@ -41,7 +41,7 @@ Daher hat GOtt der HErr in ſeinem Wort außdrücklich
 HERREN ein Grewel / vnd vmb ſolcher Grewel <m_ref id="3"/>
 willen vertreibt ſie der HERR...
 
-[MARGINAALID]
+<marginalia>
 <m id="1">Chryſoſt.
 tom: 3. in
 Evang: Io-
@@ -72,41 +72,85 @@ probl. f.
 
 <m id="3">Lut: 19. &
 20.</m>
+</marginalia>
 ```
 
 **Põhimõte:**
 - 1. jooks: mudel loeb põhiteksti järjest, paneb `<m_ref id="N"/>` ankru täpselt sinna, kus marginaalia visuaalselt algab (vertikaalne joondus pildil)
-- 2. jooks: mudel transkribeerib kõik marginaaliad järjest `[MARGINAALID]` sektsiooni, blokkidena — neid saab lugeda ülalt alla ilma põhitekstiga edasi-tagasi hüppamata
+- 2. jooks: mudel transkribeerib kõik marginaaliad järjest `<marginalia>` sektsiooni, blokkidena — neid saab lugeda ülalt alla ilma põhitekstiga edasi-tagasi hüppamata
 - **Reavahetused marginaalide sees säilivad** — need on olulised (poolituskriipsud jms)
 - Positsiooninfo säilib ankru kaudu (teame, millise lõiguga iga marginaalia seostub)
 
-## Mis on juba tehtud
-
-Repos (`scripts/`) on kolm muudatust:
-
-1. **`convert_marginalia.py`** — konversiooniskript
-   - Üksikfail: `python3 scripts/convert_marginalia.py --test page.txt` (eelvaade)
-   - Kirjutab faili: `python3 scripts/convert_marginalia.py page.txt`
-   - Loogika: järjestikused `<m>rida</m>` read → üks blokk; ankur lisatakse eelmise põhiteksti rea lõppu
-
-2. **`prompt.py`** — INSTRUCTION uuendatud, kirjeldab kahe-etapilist lähenemist
-
-3. **`build_vutt_dataset.py`** — rakendab `convert_marginalia()` automaatselt iga lehekülje peal CSV ehitamisel
-
-## Järgmised sammud
-
-1. `git pull` et saada uued skriptid
-2. `python3 scripts/vutt_sync.py` — sünkroniseeri VUTT andmed (kui pole värske)
-3. `python3 scripts/build_vutt_dataset.py` — ehita uus CSV ankrutega formaadis
-4. Treeni mudel **esimese checkpoindi peale** (`train_markup.py --base models/qwen3.5-ocr-lora-backup-...`)
-5. Testi keeruliste lehtedega (pikad marginaalid) — vaata kas ankrud ja blokkide piirid vastavad
-
-Kui tulemus on hea, mõeldakse edasi:
-- Kogu VUTT korpuse konverteerimine ankrutega formaati
-- Visuaalne esitus VUTT-is (marginaalid joonealustena, mitte inline)
 
 ## Olulised piirangud
 
 - **Hübriidvariant (lühikesed inline, pikad ankrutega) on välja lükatud** — ebaühtlus segaks mudelit rohkem kui ühtsus
 - **ID-de järjekord on kriitiline** — N-nda `<m_ref id="N"/>` peab vastama N-ndale `<m id="N">` blokile; valesti loendatud blokid on suurim riskikoht
 - **JSON formaat lükati tagasi** — JSON-süntaksi hoidmine ja OCR samaaegselt koormab mudelit kahekordse ülesandega; XML-laiendus on loomulikum juba õpitud märgenduste kontekstis
+
+---
+
+## convert_marginalia.py uue versiooni lähtepunkt
+
+Git-ajaloos on ankruversioon commit `1841460` all, aga sellel on viga: töötleb teksti rida-realt ja eeldab iga `<m>...</m>` ühel real. Mitmerealine blokk (`<m>rida1\nrida2</m>`) läheb katki.
+
+Hilisem (praegune) versioon lahendas multiline probleemi `_normalize_multiline_m`-ga – aga see jagab ühe bloki mitmeks, mis ankruversiooni jaoks ei sobi (kõik ühe marginaali read peavad minema ühe `<m id="N">` alla).
+
+**Õige lahendus:** multiline-teadlik parser, mis jälgib kas ollakse avatud `<m>` sees:
+
+```python
+def convert(text: str) -> str:
+    lines = text.split("\n")
+    result_lines = []
+    marginalia_blocks = []  # list of str (ühe bloki kogu sisu)
+    current_block_lines = None  # None = pole blokis; list = kogume blokki
+
+    def flush_block():
+        if current_block_lines is None:
+            return
+        block_id = len(marginalia_blocks) + 1
+        marginalia_blocks.append("\n".join(current_block_lines))
+        if result_lines:
+            result_lines[-1] = result_lines[-1].rstrip() + f' <m_ref id="{block_id}"/>'
+
+    for line in lines:
+        stripped = line.strip()
+
+        if current_block_lines is not None:
+            # Oleme avatud bloki sees
+            if stripped.endswith("</m>"):
+                # Blokk lõpeb siin
+                current_block_lines.append(stripped[:-4])  # eemalda </m>
+                flush_block()
+                current_block_lines = None
+            else:
+                current_block_lines.append(stripped)
+        elif stripped.startswith("<m>") and stripped.endswith("</m>"):
+            # Üherealine blokk
+            flush_block()
+            current_block_lines = [stripped[3:-4]]  # eemalda <m> ja </m>
+            flush_block()
+            current_block_lines = None
+        elif stripped.startswith("<m>"):
+            # Mitmerealise bloki algus
+            flush_block()
+            current_block_lines = [stripped[3:]]  # eemalda <m>
+        else:
+            # Põhiteksti rida
+            result_lines.append(line)
+
+    flush_block()
+
+    if not marginalia_blocks:
+        return text
+
+    m_section = "\n\n".join(
+        f'<m id="{i+1}">{c}</m>' for i, c in enumerate(marginalia_blocks)
+    )
+    return "\n".join(result_lines).rstrip() + "\n\n<marginalia>\n" + m_section + "\n</marginalia>"
+```
+
+Märkused:
+- `<pb/>` topeltleheküljed vajavad eraldi käsitlust (vt praeguse versiooni `parts = re.split(r"(<pb/>)", text)` loogika)
+- Inline `<m>...</m>` segatud reas (tekst ümber) vajab lisaks `_INLINE_M` regex asendust nagu vanas versioonis
+- Formaat: `[MARGINAALID]` asemel `<marginalia>...</marginalia>` on XML-konsistentsem

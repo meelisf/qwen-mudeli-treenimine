@@ -1,22 +1,28 @@
 #!/usr/bin/env python3
 """
-Konverteerib inline <m>...</m> ääremärkused ankrutega formaati.
+Liigutab inline <m>...</m> ääremärkused lehe lõppu.
 
-Inline formaat (praegune):
+Inline formaat (sisend):
     ...Circe,
     <m>Chryſoſt.</m>
     <m>tom: 3. in</m>
     ...
     Medea: Im gleichen...
 
-Ankrutega formaat (uus):
-    ...Circe, <m_ref id="1"/>
+Väljundformaat:
+    ...Circe,
+    ...
     Medea: Im gleichen...
-
-    [MARGINAALID]
-    <m id="1">Chryſoſt.
+    <m>Chryſoſt.
     tom: 3. in
     ...</m>
+
+Topeltleheküljel (<pb/>) pannakse <m> plokid iga lehe osa lõppu:
+    vasak tekst...
+    <m>vasaku lehe märkus</m>
+    <pb/>
+    parem tekst...
+    <m>parema lehe märkus</m>
 
 Käivitamine üksikfailil:
     python scripts/convert_marginalia.py path/to/page.txt
@@ -30,72 +36,118 @@ import sys
 from pathlib import Path
 
 
-# Kas kogu rida on üks <m>...</m> blokk (standalone marginaalia rida)
-_STANDALONE_M = re.compile(r"^<m>(.*)</m>$", re.DOTALL)
+# Mitmerealisel <m>...</m> plokil on sisu üle mitme rea — eeltöötlus jagab need ühereallisteks.
+_MULTILINE_M = re.compile(r"<m>(.*?)</m>", re.DOTALL)
 
-# Inline <m>...</m> segatud reas (mitu tagi või tekst ümber)
+
+def _normalize_multiline_m(text: str) -> str:
+    """Jagab mitmerealised <m>...</m> plokid järjestikusteks ühereallisteks <m> kirjeteks."""
+    def _split(match: re.Match) -> str:
+        content = match.group(1)
+        if "\n" not in content:
+            return match.group(0)
+        stripped = content.strip()
+        fmt_m = re.match(r"^<([ib])>(.*)</\1>$", stripped, re.DOTALL)
+        if fmt_m:
+            tag, inner = fmt_m.group(1), fmt_m.group(2)
+            return "\n".join(f"<m><{tag}>{line}</{tag}></m>" for line in inner.split("\n"))
+        return "\n".join(f"<m>{line}</m>" for line in content.split("\n"))
+
+    return _MULTILINE_M.sub(_split, text)
+
+
+# Tuvastab kõik eraldi-rea marginaalide variandid
+_M_LINE_RE = re.compile(
+    r"^"
+    r"(?:<cs>)?"
+    r"(?P<outer_fmt><[ib]>)?"
+    r"<m>"
+    r"(?P<inner_fmt><[ib]>)?"
+    r"(?P<content>.*?)"
+    r"(?:</[ib]>)?"
+    r"</m>"
+    r"(?:</[ib]>)?"
+    r"(?:</cs>)?"
+    r"$",
+    re.DOTALL,
+)
+
+# Inline <m>...</m> segatud reas (tekst ümber)
 _INLINE_M = re.compile(r"<m>(.*?)</m>", re.DOTALL)
 
 
+def _extract_m_content(line: str) -> str | None:
+    """Tagastab marginaalia sisu stringina, või None kui rida pole marginaalia."""
+    m = _M_LINE_RE.match(line.strip())
+    if m is None:
+        return None
+    content = m.group("content")
+    fmt = m.group("outer_fmt") or m.group("inner_fmt")
+    if fmt:
+        tag = fmt[1:-1]
+        content = f"<{tag}>{content}</{tag}>"
+    return content
+
+
 def convert(text: str) -> str:
-    """Teisendab inline marginaaliad ankrutega formaati.
+    """Liigutab kõik <m>sisu</m> plokid lehe lõppu.
 
-    Tagastab muutmata teksti kui marginaalid puuduvad.
+    <pb/> piiri arvestatakse: iga lehe osa saab oma <m> plokid vahetult oma teksti järele.
     """
-    lines = text.split("\n")
-    result_lines: list[str] = []
-    marginalia_blocks: list[list[str]] = []  # iga blokk = ridade list
-    current_block: list[str] = []
+    text = _normalize_multiline_m(text)
 
-    def _flush_block() -> None:
-        """Sulgeb jooksva bloki ja lisab ankru eelmisele põhiteksti reale."""
-        if not current_block:
-            return
-        block_id = len(marginalia_blocks) + 1
-        marginalia_blocks.append(current_block[:])
-        current_block.clear()
-        if result_lines:
-            result_lines[-1] = result_lines[-1].rstrip() + f' <m_ref id="{block_id}"/>'
-
-    for line in lines:
-        stripped = line.strip()
-        m = _STANDALONE_M.match(stripped)
-
-        if m:
-            # Kogu rida on marginaalia sisu
-            current_block.append(m.group(1))
-        else:
-            # Põhiteksti rida — sulge eelmine blokk (kui oli)
-            _flush_block()
-
-            # Käsitle inline <m>...</m> segatud reas
-            inline_ids: list[int] = []
-
-            def _replace_inline(match: re.Match) -> str:
-                block_id = len(marginalia_blocks) + len(inline_ids) + 1
-                inline_ids.append(block_id)
-                marginalia_blocks.append([match.group(1)])
-                return f'<m_ref id="{block_id}"/>'
-
-            processed = _INLINE_M.sub(_replace_inline, line)
-            result_lines.append(processed)
-
-    # Sulge viimane blokk (kui tekst lõpeb marginaaliaga)
-    _flush_block()
-
-    if not marginalia_blocks:
+    if not (_M_LINE_RE.search(text) or _INLINE_M.search(text)):
         return text
 
-    # Ehita [MARGINAALID] sektsioon
-    m_parts = []
-    for i, block_lines in enumerate(marginalia_blocks):
-        content = "\n".join(block_lines)
-        m_parts.append(f'<m id="{i + 1}">{content}</m>')
+    # Jagame <pb/> piiri järgi, säilitades eraldaja
+    parts = re.split(r"(<pb/>)", text)
+    result_parts = []
+    any_changed = False
 
-    marginalia_section = "[MARGINAALID]\n" + "\n\n".join(m_parts)
-    main_text = "\n".join(result_lines).rstrip()
+    for part in parts:
+        if part == "<pb/>":
+            result_parts.append(part)
+            continue
 
-    return f"{main_text}\n\n{marginalia_section}"
+        lines = part.split("\n")
+        main_lines = []
+        m_blocks = []
+        current_m_lines: list[str] = []
+
+        for line in lines:
+            m_content = _extract_m_content(line)
+            if m_content is not None:
+                current_m_lines.append(m_content)
+            else:
+                if current_m_lines:
+                    m_blocks.append("\n".join(current_m_lines))
+                    current_m_lines = []
+
+                inline_found: list[str] = []
+                def _repl(match: re.Match, _buf: list = inline_found) -> str:
+                    _buf.append(match.group(1))
+                    return ""
+                processed = _INLINE_M.sub(_repl, line)
+                if inline_found:
+                    m_blocks.extend(inline_found)
+                    processed = re.sub(r"  +", " ", processed).strip()
+                main_lines.append(processed)
+
+        if current_m_lines:
+            m_blocks.append("\n".join(current_m_lines))
+
+        if m_blocks:
+            any_changed = True
+            section_text = "\n".join(main_lines).rstrip()
+            m_text = "\n".join(f"<m>{c}</m>" for c in m_blocks)
+            result_parts.append(section_text + "\n" + m_text)
+        else:
+            result_parts.append(part)
+
+    if not any_changed:
+        return text
+
+    return "".join(result_parts)
 
 
 def main() -> None:
@@ -115,7 +167,7 @@ def main() -> None:
         original = path.read_text(encoding="utf-8")
         converted = convert(original)
 
-        has_m = bool(_STANDALONE_M.search(original) or _INLINE_M.search(original))
+        has_m = bool(_M_LINE_RE.search(original) or _INLINE_M.search(original))
         changed = converted != original
 
         if test_mode or not changed:
@@ -127,8 +179,8 @@ def main() -> None:
                 print(converted)
         else:
             path.write_text(converted, encoding="utf-8")
-            blocks = converted.count("<m id=")
-            print(f"{path}: {blocks} marginaalia blokki konverteeritud")
+            blocks = converted.count("<m>")
+            print(f"{path}: {blocks} marginaalia blokki lehe lõppu liigutatud")
 
 
 if __name__ == "__main__":

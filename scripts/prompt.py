@@ -24,22 +24,19 @@ Instructions:
    - Italic text: <i>text</i>
    - Bold text: <b>text</b>
    - Code-switching (Fraktur word in Antiqua text or vice versa): <cs>text</cs>
-9. Marginal notes — two-pass approach:
-   FIRST: in the main text, place a self-closing anchor tag at the exact position where
-   the marginal note appears in the margin (vertically aligned with the main text):
-     <m_ref id="1"/>
-   SECOND: after the main text, add a [MARGINAALID] section with each note as a block:
-     [MARGINAALID]
-     <m id="1">first line of note
-     second line of note
-     third line</m>
-
-     <m id="2">another note</m>
-   - Preserve original line breaks within each marginal note block.
-   - Number the anchors and blocks sequentially: id="1", id="2", etc.
-   - If there are no marginal notes, omit the [MARGINAALID] section entirely.
-10. Footnote number references in running text: <fn>1</fn>
-11. Signature marks (quire numbers): place at the very end, e.g. A 3
-12. Page breaks: if the image contains a double-page spread, mark the page break with <pb/>.
+9. Page breaks: if the image contains a double-page spread, mark the page break with <pb/>.
+10. Marginal notes: collect all marginal notes at the end of the page as <m>note content</m>
+   blocks, one block per note. Preserve original line breaks within each note.
+   If there are no marginal notes, omit entirely.
+   On double-page spreads: collect marginal notes for each page half immediately
+   after that half's text, before the <pb/> tag.
+   Example:
+     main text line...
+     more main text...
+     <m>first marginal note</m>
+     <m>second note
+     spanning two lines</m>
+11. Footnote number references in running text: <fn>1</fn>
+12. Signature marks (quire numbers): place at the very end, e.g. A 3
 
 Return only the exact transcription as plain text with VUTT XML markup."""

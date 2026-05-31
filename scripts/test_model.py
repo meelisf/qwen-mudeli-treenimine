@@ -32,6 +32,8 @@ from prompt import INSTRUCTION
 MODEL_PATH = "models/qwen3.5-ocr-lora"
 IMAGE_PATHS = []
 BATCH_SIZE = 3
+THINKING = False
+THINKING_BUDGET = 512  # mõtlemistokenite eelarve
 
 args = sys.argv[1:]
 i = 0
@@ -42,6 +44,12 @@ while i < len(args):
     elif args[i].startswith("--model="):
         MODEL_PATH = args[i].split("=", 1)[1]
         i += 1
+    elif args[i] == "--thinking":
+        THINKING = True
+        i += 1
+    elif args[i] == "--thinking-budget" and i + 1 < len(args):
+        THINKING_BUDGET = int(args[i + 1])
+        i += 2
     else:
         IMAGE_PATHS.append(args[i])
         i += 1
@@ -90,22 +98,26 @@ tokenizer.image_processor.size = {
     "shortest_edge": tokenizer.image_processor.size.get("shortest_edge", 65536),
 }
 
-tokenizer.chat_template = (
-    tokenizer.chat_template.replace("enable_thinking=True", "enable_thinking=False")
-    if tokenizer.chat_template and "enable_thinking" in tokenizer.chat_template
-    else tokenizer.chat_template
-)
+if not THINKING:
+    tokenizer.chat_template = (
+        tokenizer.chat_template.replace("enable_thinking=True", "enable_thinking=False")
+        if tokenizer.chat_template and "enable_thinking" in tokenizer.chat_template
+        else tokenizer.chat_template
+    )
 
 FastVisionModel.for_inference(model)
-print("Mudel laaditud.\n")
+print(f"Mudel laaditud. Thinking: {'sees (budget=' + str(THINKING_BUDGET) + ')' if THINKING else 'väljas'}\n")
+
+template_kwargs = dict(add_generation_prompt=True, tokenize=False, enable_thinking=THINKING)
+if THINKING:
+    template_kwargs["thinking_budget"] = THINKING_BUDGET
 
 CHAT_TEMPLATE = tokenizer.apply_chat_template(
     [{"role": "user", "content": [
         {"type": "text", "text": INSTRUCTION},
         {"type": "image"},
     ]}],
-    add_generation_prompt=True, tokenize=False,
-    enable_thinking=False,
+    **template_kwargs,
 )
 
 # ---------------------------------------------------------------------------
@@ -114,6 +126,7 @@ CHAT_TEMPLATE = tokenizer.apply_chat_template(
 
 def strip_output(text: str) -> str:
     text = re.sub(r"<think>.*?</think>", "", text, flags=re.DOTALL)
+    text = re.sub(r"<\|.*?\|>", "", text)
     for marker in ["</assistant>", "<|assistant|>", "<|im_start|>assistant", "assistant\n"]:
         if marker in text:
             text = text.split(marker, 1)[-1]
@@ -158,14 +171,17 @@ for batch_start in range(0, total, BATCH_SIZE):
     ).to("cuda")
 
     with torch.no_grad():
-        outputs = model.generate(
-            **inputs,
-            max_new_tokens=4096,
-            do_sample=False,
+        generate_kwargs = dict(
+            max_new_tokens=4096 + THINKING_BUDGET if THINKING else 4096,
             use_cache=True,
         )
+        if THINKING:
+            generate_kwargs.update(do_sample=True, temperature=0.6, top_p=0.95, top_k=20, repetition_penalty=1.3)
+        else:
+            generate_kwargs["do_sample"] = False
+        outputs = model.generate(**inputs, **generate_kwargs)
 
-    decoded_texts = tokenizer.batch_decode(outputs, skip_special_tokens=True)
+    decoded_texts = tokenizer.batch_decode(outputs, skip_special_tokens=not THINKING)
 
     for img_p, raw_text in zip(valid_paths, decoded_texts):
         clean_text = strip_output(raw_text)

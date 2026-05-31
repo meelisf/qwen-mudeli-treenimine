@@ -112,12 +112,6 @@ tokenizer.image_processor.size = {
 print(f"Pildi max_pixels: {tokenizer.image_processor.size['longest_edge']:,} px "
       f"→ ~{5_120_000 // 1024} visuaaltokenit")
 
-tokenizer.chat_template = (
-    tokenizer.chat_template.replace("enable_thinking=True", "enable_thinking=False")
-    if tokenizer.chat_template and "enable_thinking" in tokenizer.chat_template
-    else tokenizer.chat_template
-)
-
 # Checkpoint sisaldab juba LoRA adaptereid – get_peft_model() EI tohi järgneda
 print("Mudel laaditud etapp 1 checkpoindist (LoRA adapterid juba küljes).")
 model.print_trainable_parameters()
@@ -208,7 +202,7 @@ trainer = SFTTrainer(
         gradient_accumulation_steps=4 if TEST_MODE else 8,
         warmup_steps=2 if TEST_MODE else 10,
         max_steps=5 if TEST_MODE else -1,
-        num_train_epochs=1 if TEST_MODE else 2,
+        num_train_epochs=1 if TEST_MODE else 1,
         learning_rate=1e-4,     # inkrementaalne: väiksem LR kui etapp 1 (2e-4)
         logging_steps=1 if TEST_MODE else 10,
         optim="adamw_8bit",
@@ -273,7 +267,8 @@ else:
     input_text = tokenizer.apply_chat_template(messages, add_generation_prompt=True, enable_thinking=False)
     inputs = tokenizer(image, input_text, add_special_tokens=False, return_tensors="pt").to("cuda")
 
-    outputs = model.generate(**inputs, max_new_tokens=4096, use_cache=True)
-    decoded = tokenizer.decode(outputs[0][len(inputs.input_ids[0]):], skip_special_tokens=True).strip()
+    outputs = model.generate(**inputs, max_new_tokens=4096, use_cache=True, do_sample=False)
+    import re as _re
+    raw = tokenizer.decode(outputs[0][len(inputs.input_ids[0]):], skip_special_tokens=True).strip()
     print("\n--- TULEMUS ---")
-    print(decoded)
+    print(raw)

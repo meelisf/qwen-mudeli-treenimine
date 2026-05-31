@@ -1,5 +1,16 @@
 # OCR mudeli treenimise spikker
 
+## SSH kaudu käivitamine — kasuta alati tmux-i!
+
+```bash
+tmux new -s treening          # uus sessioon (tee seda enne kõike muud)
+# Ctrl+A, D                   # lahku sessioonist (treening jookseb edasi)
+tmux attach -t treening       # tule tagasi uue SSH sessiooni järel
+tmux ls                       # vaata aktiivseid sessioone
+```
+
+---
+
 ## Täistreenimine (kõik sammud korraga)
 
 ```bash
@@ -41,6 +52,25 @@ python scripts/train_markup.py           # täistreening (~2-4h)
 sudo systemctl start ocr-service         # taaskäivita pärast
 ```
 Tulemus: `models/qwen3.5-ocr-markup-YYYYMMDD/`
+
+---
+
+## Mudeli testimine
+
+Enne aktiveerimist testi treenitud mudelit `data/test/` piltidega:
+
+```bash
+source venv/bin/activate
+
+# Kõik testpildid, aktiivne mudel
+python scripts/test_model.py
+
+# Kõik testpildid, äsja treenitud mudel
+python scripts/test_model.py --model models/qwen3.5-ocr-markup-YYYYMMDD
+
+# Üks konkreetne pilt
+python scripts/test_model.py --model models/qwen3.5-ocr-markup-YYYYMMDD data/test/pilt.jpg
+```
 
 ---
 
@@ -95,3 +125,4 @@ sudo systemctl stop ocr-service
 journalctl -u ocr-service -f        # logid reaalajas
 tail -f ocr-service.log             # skripti oma logi
 ```
+
