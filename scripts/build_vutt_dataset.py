@@ -18,6 +18,8 @@ import shutil
 import re
 from pathlib import Path
 
+from convert_marginalia import convert as convert_marginalia
+
 DRY_RUN   = "--stats" in sys.argv
 RAW_DIR   = Path("data/vutt-raw")
 OUT_DIR   = Path("data/vutt")
@@ -102,6 +104,8 @@ def main():
             if not transcription:
                 skipped_empty += 1
                 continue
+
+            transcription = convert_marginalia(transcription)
 
             # Unikaalne pildinimi
             img_name = safe_image_name(work_dir.name, jpg_path.name)
