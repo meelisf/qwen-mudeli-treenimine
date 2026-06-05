@@ -24,6 +24,7 @@ import gc
 import re
 import unicodedata
 import shutil
+from typing import Optional
 from pathlib import Path
 from datetime import datetime
 from PIL import Image as PILImage
@@ -129,7 +130,7 @@ if not torch.cuda.is_available():
     raise RuntimeError("CUDA puudub!")
 
 # Laisk mudeli haldus — laadime ainult kui vaja, vahetame tüübivahel
-_current_model_type: str | None = None
+_current_model_type = None  # type: Optional[str]
 model = None
 tokenizer = None
 
@@ -159,6 +160,7 @@ def ensure_model(model_type: str):
         del tokenizer
         model = None
         tokenizer = None
+        _current_model_type = None
         gc.collect()
         torch.cuda.empty_cache()
         logger.info("Mudel vabastatud.")
@@ -341,6 +343,8 @@ def process_batch(batch_items):
     for i, raw_text in enumerate(decoded_texts):
         _, txt_out_path = valid_items[i]
         clean_text = strip_output(raw_text)
+        if not clean_text.strip():
+            logger.warning(f"Tühi väljund: {os.path.basename(txt_out_path)} — mudel ei genereerinud teksti")
         with open(txt_out_path, "w", encoding="utf-8") as f:
             f.write(clean_text)
         logger.info(f"Transkribeeritud: {os.path.basename(txt_out_path)}")
