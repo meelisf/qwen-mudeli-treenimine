@@ -74,10 +74,13 @@ failed_pdfs = set()
 
 # --- 1. SEADISTUS ---
 
-JALGITAV_KAUST = "/home/mf/Dokumendid/LLM/AUTO-OCR"
+BASE_OCR_KAUST = "/home/mf/Dokumendid/LLM/AUTO-OCR"
 
-# Testimiseks etapp 1 mudel (vrdl. etapp 2 "models/qwen3.5-ocr-lora-stage2")
-MODEL_PATH = "models/qwen3.5-ocr-lora"
+# Iga tüübi jaoks eraldi alamkaust ja mudel
+MODEL_CONFIGS = {
+    "print": "models/qwen3.5-ocr-lora",
+    "hand":  "models/qwen3.5-ocr-hand-lora",
+}
 
 BATCH_SIZE = 3
 
@@ -117,37 +120,61 @@ EXTENSIONS = {".jpg", ".jpeg", ".png", ".bmp", ".tif", ".tiff"}
 # --- 2. MUDELI LAADIMINE ---
 
 logger.info("=== Käivitan In-Place OCR Teenuse (Qwen3.5-9B) ===")
-logger.info(f"Jälgin kausta: {JALGITAV_KAUST}")
-logger.info(f"Mudel: {MODEL_PATH}")
+logger.info(f"Baaskaust: {BASE_OCR_KAUST}")
+logger.info(f"Mudelid: {MODEL_CONFIGS}")
 logger.info(f"Logi fail: {LOG_FILE}")
 
 if not torch.cuda.is_available():
     logger.error("CUDA puudub!")
     raise RuntimeError("CUDA puudub!")
 
-logger.info(f"Laen mudelit: {MODEL_PATH} ...")
-model, tokenizer = FastVisionModel.from_pretrained(
-    model_name=MODEL_PATH,
-    load_in_4bit=True,
-)
+# Laisk mudeli haldus — laadime ainult kui vaja, vahetame tüübivahel
+_current_model_type: str | None = None
+model = None
+tokenizer = None
 
-# Piira pildi resolutsiooni – sama seadistus mis treenimiseks.
-# Qwen3.5-9B vaikeväärtus 16M px → OOM; 5M px ≈ 4900 visuaaltokenit, piisab OCR-ks.
-# NB! longest_edge on PIKSLITE KOGUARV, mitte serva pikkus.
-tokenizer.image_processor.size = {
-    "longest_edge": 5_120_000,
-    "shortest_edge": tokenizer.image_processor.size.get("shortest_edge", 65536),
-}
 
-# Keela reasoning/thinking tokenid
-tokenizer.chat_template = (
-    tokenizer.chat_template.replace("enable_thinking=True", "enable_thinking=False")
-    if tokenizer.chat_template and "enable_thinking" in tokenizer.chat_template
-    else tokenizer.chat_template
-)
+def _setup_tokenizer(tok):
+    tok.image_processor.size = {
+        "longest_edge": 5_120_000,
+        "shortest_edge": tok.image_processor.size.get("shortest_edge", 65536),
+    }
+    if tok.chat_template and "enable_thinking" in tok.chat_template:
+        tok.chat_template = tok.chat_template.replace(
+            "enable_thinking=True", "enable_thinking=False"
+        )
+    return tok
 
-FastVisionModel.for_inference(model)
-logger.info("Mudel laetud ja ootel.")
+
+def ensure_model(model_type: str):
+    """Laadib mudeli kui pole laetud või tüüp on muutunud."""
+    global _current_model_type, model, tokenizer
+
+    if _current_model_type == model_type:
+        return
+
+    if model is not None:
+        logger.info(f"Vabastab mudeli '{_current_model_type}'...")
+        del model
+        del tokenizer
+        model = None
+        tokenizer = None
+        gc.collect()
+        torch.cuda.empty_cache()
+        logger.info("Mudel vabastatud.")
+
+    model_path = MODEL_CONFIGS[model_type]
+    logger.info(f"Laen mudelit '{model_type}': {model_path} ...")
+    m, tok = FastVisionModel.from_pretrained(
+        model_name=model_path,
+        load_in_4bit=True,
+    )
+    tok = _setup_tokenizer(tok)
+    FastVisionModel.for_inference(m)
+    model = m
+    tokenizer = tok
+    _current_model_type = model_type
+    logger.info(f"Mudel '{model_type}' laetud.")
 
 # --- 3. ABIFUNKTSIOONID ---
 
@@ -160,8 +187,6 @@ def get_chat_template():
         add_generation_prompt=True, tokenize=False,
         enable_thinking=False,
     )
-
-CHAT_TEMPLATE = get_chat_template()
 
 def strip_output(text: str) -> str:
     """
@@ -258,7 +283,7 @@ def expand_pdf(pdf_path):
     except Exception as e:
         logger.error(f"Viga PDF lahtipakkimisel {pdf_path}: {e}")
         failed_pdfs.add(str(pdf_path))
-        vigased_dir = Path(JALGITAV_KAUST) / "VIGASED"
+        vigased_dir = Path(BASE_OCR_KAUST) / "VIGASED"
         vigased_dir.mkdir(exist_ok=True)
         try:
             dest = vigased_dir / pdf_path.name
@@ -294,9 +319,10 @@ def process_batch(batch_items):
     if not images_pil:
         return
 
+    chat_template = get_chat_template()
     inputs = tokenizer(
         images_pil,
-        [CHAT_TEMPLATE] * len(images_pil),
+        [chat_template] * len(images_pil),
         add_special_tokens=False,
         return_tensors="pt",
         padding=True,
@@ -331,37 +357,51 @@ HEARTBEAT_INTERVAL = 60
 def main_loop():
     last_heartbeat = time.time()
 
+    # Loo alamkaustad kui puuduvad
+    for mt in MODEL_CONFIGS:
+        Path(BASE_OCR_KAUST, mt).mkdir(parents=True, exist_ok=True)
+
     while not shutdown_requested:
-        # 1. Otsi PDF-e ja paki lahti
-        for pdf in list(Path(JALGITAV_KAUST).rglob("*.pdf")):
-            if shutdown_requested:
-                break
-            expand_pdf(pdf)
-
-        # 2. Otsi pilte, millel puudub .txt fail
-        image_candidates = natsorted(
-            [f for f in Path(JALGITAV_KAUST).rglob("*")
-             if f.suffix.lower() in EXTENSIONS and f.is_file()],
-            key=lambda x: str(x)
-        )
-
-        tasks_queue = [
-            (str(img), str(img.with_suffix(".txt")))
-            for img in image_candidates
-            if not img.with_suffix(".txt").exists()
-        ]
-
-        # 3. Töötle
-        total = len(tasks_queue)
-        if total > 0:
-            logger.info(f"Leidsin {total} pilti, mis vajavad transkribeerimist.")
-            for i in range(0, total, BATCH_SIZE):
+        # 1. Paki lahti PDF-id mõlemas alamkaustas
+        for mt in MODEL_CONFIGS:
+            scan_root = Path(BASE_OCR_KAUST, mt)
+            for pdf in list(scan_root.rglob("*.pdf")):
                 if shutdown_requested:
                     break
-                batch = tasks_queue[i : i + BATCH_SIZE]
-                logger.info(f"Töötlen {i+1}–{min(i+BATCH_SIZE, total)} / {total}")
-                process_batch(batch)
-                gc.collect()
+                expand_pdf(pdf)
+
+        # 2. Kogu töötlemata pildid tüübi järgi
+        tasks_by_type: dict = {mt: [] for mt in MODEL_CONFIGS}
+
+        for mt in MODEL_CONFIGS:
+            scan_root = Path(BASE_OCR_KAUST, mt)
+            candidates = natsorted(
+                [f for f in scan_root.rglob("*")
+                 if f.suffix.lower() in EXTENSIONS and f.is_file()],
+                key=lambda x: str(x)
+            )
+            tasks_by_type[mt] = [
+                (str(img), str(img.with_suffix(".txt")))
+                for img in candidates
+                if not img.with_suffix(".txt").exists()
+            ]
+
+        total = sum(len(v) for v in tasks_by_type.values())
+
+        # 3. Töötle tüüp-tüübi kaupa (minimeerib mudeli vahetusi)
+        if total > 0:
+            logger.info(f"Leidsin {total} pilti ({', '.join(f'{mt}:{len(tasks_by_type[mt])}' for mt in MODEL_CONFIGS)}).")
+            for mt, tasks in tasks_by_type.items():
+                if not tasks or shutdown_requested:
+                    continue
+                ensure_model(mt)
+                for i in range(0, len(tasks), BATCH_SIZE):
+                    if shutdown_requested:
+                        break
+                    batch = tasks[i:i + BATCH_SIZE]
+                    logger.info(f"[{mt}] Töötlen {i+1}–{min(i+BATCH_SIZE, len(tasks))} / {len(tasks)}")
+                    process_batch(batch)
+                    gc.collect()
             logger.info("Kõik hetke tööd tehtud. Ootan uusi...")
             last_heartbeat = time.time()
         else:
