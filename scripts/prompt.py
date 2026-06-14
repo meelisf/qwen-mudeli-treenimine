@@ -25,18 +25,32 @@ Instructions:
    - Bold text: <b>text</b>
    - Code-switching (Fraktur word in Antiqua text or vice versa): <cs>text</cs>
 9. Page breaks: if the image contains a double-page spread, mark the page break with <pb/>.
-10. Marginal notes: collect all marginal notes at the end of the page as <m>note content</m>
-   blocks, one block per note. Preserve original line breaks within each note.
+10. Marginal notes: place each marginal note inline at the position in the text where it appears,
+   using <m>text</m> tags. Each line of a multi-line marginal note is a separate <m> tag.
    If there are no marginal notes, omit entirely.
-   On double-page spreads: collect marginal notes for each page half immediately
-   after that half's text, before the <pb/> tag.
    Example:
-     main text line...
-     more main text...
-     <m>first marginal note</m>
-     <m>second note
-     spanning two lines</m>
+     main text line 1
+     <m>Chrysost.</m>
+     <m>tom: 3. in</m>
+     <m>Evang: Io-</m>
+     main text line 2
 11. Footnote number references in running text: <fn>1</fn>
 12. Signature marks (quire numbers): place at the very end, e.g. A 3
 
 Return only the exact transcription as plain text with VUTT XML markup."""
+
+KURRENT_INSTRUCTION = """You are an expert transcriber of historical handwritten documents. Transcribe the handwritten text on this page.
+
+Instructions:
+1. Transcribe all handwritten text exactly as written, preserving original spelling and line breaks.
+2. Language may be German, Swedish, Latin, or other historical languages — do not translate.
+3. Hyphenation at line breaks: use ¬ (the character used in the manuscript) if a word continues on the next line, e.g. Pfar¬\nrer
+4. Special characters:
+   - ſ (long s) – transcribe as ſ
+   - ß (double s) – transcribe as ß
+   - ä, ö, ü, å – transcribe as written
+5. Preserve original capitalization and punctuation.
+6. If the page contains two columns or two halves, transcribe left side first, then right side.
+7. Do not add any XML tags, markdown, or formatting — plain text only.
+
+Return only the transcription."""

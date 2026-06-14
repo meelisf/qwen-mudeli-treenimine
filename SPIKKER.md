@@ -1,5 +1,32 @@
 # OCR mudeli treenimise spikker
 
+## Temperatuuri ja GPU jälgimine
+
+```bash
+# CPU temperatuurid (°C)
+paste <(cat /sys/class/thermal/thermal_zone*/type) \
+      <(awk '{printf "%.0f\n", $1/1000}' /sys/class/thermal/thermal_zone*/temp) \
+      | column -s $'\t' -t
+
+# GPU temperatuur ja koormus
+nvidia-smi --query-gpu=temperature.gpu,power.draw,utilization.gpu --format=csv,noheader
+
+# Pidev jälgimine (2s interval)
+watch -n2 "paste <(cat /sys/class/thermal/thermal_zone*/type) \
+  <(awk '{printf \"%.0f\n\", \$1/1000}' /sys/class/thermal/thermal_zone*/temp) \
+  | column -s \$'\t' -t; echo; \
+  nvidia-smi --query-gpu=temperature.gpu,power.draw,utilization.gpu --format=csv,noheader"
+```
+
+## Pikaks treeninguks — pärast reebooti seadista uuesti!
+
+```bash
+sudo nvidia-smi -pl 450                                              # GPU 450W (vaikimisi 575W)
+echo 1 | sudo tee /sys/devices/system/cpu/intel_pstate/no_turbo     # CPU turbo välja
+```
+
+---
+
 ## SSH kaudu käivitamine — kasuta alati tmux-i!
 
 ```bash

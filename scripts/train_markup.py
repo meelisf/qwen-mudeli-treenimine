@@ -33,6 +33,7 @@ from trl import SFTTrainer, SFTConfig
 from unsloth.trainer import UnslothVisionDataCollator
 from PIL import Image as PILImage
 from prompt import INSTRUCTION
+from convert_marginalia import remove_empty_m_tags
 
 TEST_MODE = "--test" in sys.argv
 if TEST_MODE:
@@ -127,6 +128,7 @@ class LehekyljAndmestik:
     def __init__(self, sources):
         self.samples = []
         skipped = 0
+        cleaned_m = 0
 
         for src in sources:
             csv_path   = src["csv"]
@@ -139,17 +141,25 @@ class LehekyljAndmestik:
                     if not isinstance(t, str) or not t.strip():
                         skipped += 1
                         continue
+                    t_clean = remove_empty_m_tags(t)
+                    if not t_clean:
+                        skipped += 1
+                        continue
+                    if t_clean != t.strip():
+                        cleaned_m += 1
                     img_path = os.path.join(images_dir, os.path.basename(row["failinimi"]))
                     if not os.path.exists(img_path):
                         skipped += 1
                         continue
                     self.samples.append({
                         "failinimi": img_path,
-                        "transkriptsioon": t.strip(),
+                        "transkriptsioon": t_clean,
                     })
 
         if skipped:
             print(f"  Hoiatus: {skipped} rida jäeti vahele.")
+        if cleaned_m:
+            print(f"  Puhastatud tühjad <m> tagid: {cleaned_m} leheküljel.")
 
         print(f"  Andmestik: {len(self.samples)} näidet ({len(sources)} allikast)")
 

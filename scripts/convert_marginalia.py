@@ -150,6 +150,27 @@ def convert(text: str) -> str:
     return "".join(result_parts)
 
 
+def remove_empty_m_tags(text: str) -> str:
+    """Eemaldab tühjad <m>...</m> tagid (nt <m></m>, <m><i></i></m>)."""
+    def _is_empty(content: str) -> bool:
+        s = content.strip()
+        while s:
+            new = re.sub(r"<\w+>\s*</\w+>", "", s).strip()
+            if new == s:
+                break
+            s = new
+        return not s
+
+    result = re.sub(
+        r"<m>(.*?)</m>",
+        lambda m: "" if _is_empty(m.group(1)) else m.group(0),
+        text,
+        flags=re.DOTALL,
+    )
+    result = re.sub(r"\n{3,}", "\n\n", result)
+    return result.strip()
+
+
 def main() -> None:
     args = [a for a in sys.argv[1:] if not a.startswith("--")]
     test_mode = "--test" in sys.argv
