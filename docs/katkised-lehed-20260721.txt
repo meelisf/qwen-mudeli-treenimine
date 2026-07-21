@@ -1,0 +1,187 @@
+Ristuva pesastusega lehti: 28
+
+==============================================================================
+
+TEOS : 1632-1-Relatio_Von_Inauguration_der_Universität_zu_Dörpat
+LEHT : r_acad_dorp_1632_1_Page_05.txt
+  rida 11: </i> sulgeb, aga lahti on <cs>
+    <cs><i><cs>Fridericus Menius P.L.C.</i></cs>
+  rida 12: </cs> sulgeb, aga lahti on <i>
+    <cs><i>Hiſt. & Antiq. Prof. Publ.</cs></i>
+
+TEOS : 1636-7-Oratio_de_bacchanalibus_quam_in_Regia_Academia_Dor
+LEHT : r_acad_dorp_1636_5_6_7_0027.txt
+  rida 97: </m> sulgeb, aga lahti on <i>
+    <m></m></m></i>
+
+TEOS : 1636-7-Oratio_de_bacchanalibus_quam_in_Regia_Academia_Dor
+LEHT : r_acad_dorp_1636_5_6_7_0029.txt
+  rida 91: </m> sulgeb, aga lahti on <i>
+    </m></i>
+
+TEOS : 1637-9-Oratio_de_natura_obedientiae_dn_professoribus_debi
+LEHT : r_acad_dorp_1637_9_10_11_0003.txt
+  rida 14: </i> sulgeb, aga lahti on <cs>
+    <i>CTVM OCHSENSTIERNA, Lib. Baronem in <cs>Ekeby⸗</i></cs>
+  rida 15: </cs> sulgeb, aga lahti on <i>
+    <cs><i>holm & Süderbo</cs>/ Dominum in <cs>Rappien</cs> &c. SS. Reg. Maj. Sveciæ</i>
+
+TEOS : 1639-4-Moscoviae_historia_quam_in_Regia_Academia_Gustavia
+LEHT : r_acad_dorp_1639_1_2_3_4_5_0031.txt
+  rida 36: </i> sulgeb, aga lahti on <cs>
+    <i><cs>Söderboo</cs>/ Domine in <cs>Rappien</cs> & <cs>Em⸗</i></cs>
+  rida 37: </cs> sulgeb, aga lahti on <i>
+    <cs><i>beckshoff</cs>/ S. Reg. Maj. Regniq; Sveciæ Ar-</i>
+
+TEOS : 1640-12-Moscoviae_historia_quam_in_Regia_Academia_Gustavia
+LEHT : r_acad_dorp_1640_12_13_14_15_0003.txt
+  rida 36: </i> sulgeb, aga lahti on <cs>
+    <i><cs>Söderboo</cs>/ Domine in <cs>Rappien</cs> & <cs>Em⸗</i></cs>
+  rida 37: </cs> sulgeb, aga lahti on <i>
+    <cs><i>beckshoff</cs>/ S. Reg. Maj. Regniq; Sveciæ Ar-</i>
+
+TEOS : 1640-13-Oratio_de_veritate_quae_in_Regia_Academia_Gustavia
+LEHT : r_acad_dorp_1640_12_13_14_15_0020.txt
+  rida 30: </cs> sulgeb, aga lahti on <i>
+    <i>SENSTIERNA, L. Baro in</i> <cs><i><i>Ekeby-</i></cs>
+
+TEOS : 1640-5-Oratio_de_nativitate_Domini_et_Salvatoris_nostri_J
+LEHT : r_acad_dorp_1640_5_6_7_0008.txt
+  rida 28: </i> sulgeb, aga lahti on <m>
+    <m>teſtimoniis.</i></m>
+
+TEOS : 1640-6-Oratio_de_rerum_terrenarum_vanitate_quam_in_Regia_
+LEHT : r_acad_dorp_1640_5_6_7_0014.txt
+  rida 36: </i> sulgeb, aga lahti on <cs>
+    <i>SENSTIERNA, L. Baro in <cs>Ekeby⸗</i></cs>
+  rida 37: </cs> sulgeb, aga lahti on <i>
+    <cs><i>holm</cs> & <cs>Söderboo</cs>/ Domine in <cs>Rappien</cs> &c.</i>
+
+TEOS : 1641-3-Oratio_de_humilitate_quam_in_Regia_Academia_Gustav
+LEHT : r_acad_dorp_1641_1_2_3_4_5_0035.txt
+  rida 6: </m> sulgeb, aga lahti on <i>
+    <m><i><i>motio.</i></m>
+
+TEOS : 1642-11-Oratio_de_civitate_quam_in_Regia_Academia_Gustavia
+LEHT : r_acad_dorp_1642_10_11_0018.txt
+  rida 10: </i> sulgeb, aga lahti on <m>
+    <m><i>A<m>rg. 3.</i>
+  rida 16: </i> sulgeb, aga lahti on <m>
+    <m><i>A<m>rg. 4.</i></m>
+
+TEOS : 1642-13-Oratio_de_amore_sive_philostorgia_liberorum_erga_p
+LEHT : r_acad_dorp_1642_12_13_14_0012.txt
+  rida 18: </i> sulgeb, aga lahti on <cs>
+    <i>SENSTIERNA, L. Baronem in <cs>Ekebyholm</cs> & <cs>Suderboo</cs>/ Dominum in <cs>Rap⸗</i></cs>
+  rida 19: </cs> sulgeb, aga lahti on <i>
+    <cs><i>pien</cs> &c. per Livoniam & Ingriam Generalem Gubernatorem, Dominum noſtrum</i>
+  rida 47: </cs> sulgeb, aga lahti on <i>
+    <cs><i>Suderboo</cs>/ Domine in <cs>Rappien</cs>/ etc. per</i>
+
+TEOS : 1642-19-Oratio_de_poetica_quam_in_Regia_Academia_Gustavian
+LEHT : r_acad_dorp_1642_16_17_18_19_0036.txt
+  rida 44: </m> sulgeb, aga lahti on <i>
+    <m><i>3.</m>
+  rida 45: </i> sulgeb, aga lahti on <m>
+    <m>Lib. 5. Me-</i></m>
+
+TEOS : 1642-2-Oratio_theologica_de_restitutione_hominis_quam_in_
+LEHT : r_acad_dorp_1642_1_2_3_0019.txt
+  rida 13: </i> sulgeb, aga lahti on <cs>
+    <i>NEDICTVM OCHSENSTIERNA, L. Baronem in <cs>E⸗</i></cs>
+  rida 14: </cs> sulgeb, aga lahti on <i>
+    <cs><i>kebyholm</cs> & <cs>Suderboo</cs>/ Dominum in <cs>Rappien</cs> &c. per Livoniam</i>
+
+TEOS : 1642-2-Oratio_theologica_de_restitutione_hominis_quam_in_
+LEHT : r_acad_dorp_1642_1_2_3_0020.txt
+  rida 20: </i> sulgeb, aga lahti on <m>
+    <m><i><i>M<m>edium</i></m>
+
+TEOS : 1642-2-Oratio_theologica_de_restitutione_hominis_quam_in_
+LEHT : r_acad_dorp_1642_1_2_3_0024.txt
+  rida 12: </i> sulgeb, aga lahti on <m>
+    <m><i>[---] <m>in Spec.</i></m>
+  rida 33: </i> sulgeb, aga lahti on <m>
+    <m><i>Ex<m>poſitio.</i></m>
+
+TEOS : 1642-5-Oratio_de_persona_officio_et_beneficiis_Domini_et_
+LEHT : r_acad_dorp_1642_4_5_6_0013.txt
+  rida 18: </i> sulgeb, aga lahti on <cs>
+    <i>DN. MATTHIÆ in <cs>Häg⸗</i></cs>
+  rida 19: </cs> sulgeb, aga lahti on <i>
+    <cs><i>aum</cs> Paſtori religioſißimo;</i>
+
+TEOS : 1643-4-Oratio_de_vera_Dei_ecclesia_quam_in_Regia_Academia
+LEHT : r_acad_dorp_1643_4_5_0004.txt
+  rida 41: </i> sulgeb, aga lahti on <m>
+    <m><i>Con<m>ſequens</i></m>
+
+TEOS : 1645-7-De_lykanthropis_oratio_quam_in_Regia_Academia_Gust
+LEHT : r_acad_dorp_1645_7_8_9_0005.txt
+  rida 40: </i> sulgeb, aga lahti on <m>
+    <m>Prop. 5.</i></m>
+
+TEOS : 1645-7-De_lykanthropis_oratio_quam_in_Regia_Academia_Gust
+LEHT : r_acad_dorp_1645_7_8_9_0010.txt
+  rida 49: </m> sulgeb, aga lahti on <i>
+    </m></i>
+
+TEOS : 1647-1-Oratio_panegyrica_qua_examinatur_quinta_pars_sive_
+LEHT : r_acad_dorp_1647_1_2_0017.txt
+  rida 21: </i> sulgeb, aga lahti on <m>
+    <m> </i>p. 123.<i></m>
+  rida 21: </m> sulgeb, aga lahti on <i>
+    <m> </i>p. 123.<i></m>
+
+TEOS : 1648-6-De_magistratu_politico_oratio_quam_in_Regia_Academ
+LEHT : r_acad_dorp_1648_5_6_7_8_0012.txt
+  rida 44: </i> sulgeb, aga lahti on <cs>
+    <i><cs>Saalſtad</cs>/ Domine in <cs>Frödz⸗</i></cs>
+  rida 45: </cs> sulgeb, aga lahti on <i>
+    <cs><i>wijck</cs> &c. Regij Supremi Judi-</i>
+
+TEOS : 1650-4-Finnoniae_elogia_quae_in_Regia_Gustaviana_Adolphin
+LEHT : r_acad_dorp_1650_4_Image_004.txt
+  rida 2: </i> sulgeb, aga lahti on <m>
+    </i></m>
+  rida 5: </m> sulgeb, aga lahti on <i>
+    </m></i>
+  rida 40: </i> sulgeb, aga lahti on <m>
+    <m><i>σις  1.</i></i></m>
+  rida 47: </i> sulgeb, aga lahti on <m>
+    <m><i></i></i></m>
+  rida 69: </i> sulgeb, aga lahti on <m>
+    <m>Nomine.</i></m>
+
+TEOS : 1650-4-Finnoniae_elogia_quae_in_Regia_Gustaviana_Adolphin
+LEHT : r_acad_dorp_1650_4_Image_007.txt
+  rida 33: </i> sulgeb, aga lahti on <cs>
+    <i>Dominus, DN. <cs>PETER BRAHE</cs>/ Comes de <cs>Wi⸗</i></cs>
+  rida 34: </cs> sulgeb, aga lahti on <i>
+    <cs><i>ſingsborg</cs>/ L. Baro de <cs>Rydboholm</cs> & <cs>Lindholm</cs>; Regni</i>
+
+TEOS : 1650-4-Finnoniae_elogia_quae_in_Regia_Gustaviana_Adolphin
+LEHT : r_acad_dorp_1650_4_Image_012.txt
+  rida 20: </m> sulgeb, aga lahti on <i>
+    </m></i>
+
+TEOS : 1650-7-In_salutiferam_nativitatem_Domini_et_Salvatoris_no
+LEHT : r_acad_dorp_1650_7_8_9_0005.txt
+  rida 49: </m> sulgeb, aga lahti on <i>
+    <m><i></m>
+
+TEOS : 1652-1-De_libertate_politica_oratio_quam_in_Regia_Gustavi
+LEHT : r_acad_dorp_1652_1_2_3_0003.txt
+  rida 49: </i> sulgeb, aga lahti on <m>
+    <m>Exordij.</i></m>
+
+TEOS : 1691-5-Oratio_de_natura_et_vigore_ingeniorum_Septentriona
+LEHT : r_acad_dorp_1691_1_2_3_4_5_0024.txt
+  rida 58: </cs> sulgeb, aga lahti on <i>
+    tes, majoraq; inde nutrimenta capientes <cs><i>corpo-</cs></i>
+  rida 60: </i> sulgeb, aga lahti on <cs>
+    <i><cs>magni-</i></cs>
+
+==============================================================================
+
+Kokku 28 lehte, 48 viga.

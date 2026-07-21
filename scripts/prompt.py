@@ -35,7 +35,10 @@ Instructions:
      <m>Evang: Io-</m>
      main text line 2
 11. Footnote number references in running text: <fn>1</fn>
-12. Signature marks (quire numbers): place at the very end, e.g. A 3
+12. Musical notation: if the page contains printed music (staves, notes), do not attempt
+   to transcribe it – place a single <noodid> marker at that position and continue with
+   the surrounding text.
+13. Signature marks (quire numbers): place at the very end, e.g. A 3
 
 Return only the exact transcription as plain text with VUTT XML markup."""
 

@@ -18,7 +18,9 @@ import shutil
 import re
 from pathlib import Path
 
-from convert_marginalia import remove_empty_m_tags
+from convert_marginalia import (
+    remove_empty_m_tags, unwrap_tags, fix_crossed_tags, remove_empty_tags,
+)
 
 DRY_RUN   = "--stats" in sys.argv
 RAW_DIR   = Path("data/vutt-raw")
@@ -27,6 +29,59 @@ IMG_DIR   = OUT_DIR / "images"
 CSV_PATH  = OUT_DIR / "metadata.csv"
 
 VALMIS_STATUSES = {"Valmis"}
+
+# --- Materjali tüüp -------------------------------------------------------
+# Trüki- ja käsikirjamudelit treenitakse eraldi, seega andmestik tuleb
+# tüübi järgi lahku ajada. VUTT märgib tüübi teose _metadata.json failis
+# Wikidata ID-ga: Q1261026 = trükis, Q87167 = käsikiri.
+WD_PRINT = "Q1261026"
+WD_HAND  = "Q87167"
+
+MATERIAL = "print"          # --type print|hand|all
+INCLUDE_UNKNOWN = "--include-unknown" in sys.argv
+for _i, _a in enumerate(sys.argv):
+    if _a == "--type" and _i + 1 < len(sys.argv):
+        MATERIAL = sys.argv[_i + 1]
+    elif _a.startswith("--type="):
+        MATERIAL = _a.split("=", 1)[1]
+if MATERIAL not in ("print", "hand", "all"):
+    print(f"Viga: --type peab olema print, hand või all (oli: {MATERIAL})")
+    sys.exit(1)
+
+
+def read_work_type(work_dir: Path) -> str:
+    """Tagastab 'print', 'hand' või 'unknown' teose _metadata.json põhjal.
+
+    Väli on ajaloo jooksul olnud mitmes vormis: Wikidata-dict, legacy-dict
+    labeliga, ja paljas string. Kõiki tuleb toetada.
+    """
+    meta = work_dir / "_metadata.json"
+    if not meta.exists():
+        return "unknown"
+    try:
+        with open(meta, encoding="utf-8") as f:
+            t = json.load(f).get("type")
+    except Exception:
+        return "unknown"
+
+    if t is None:
+        return "unknown"
+    if isinstance(t, dict):
+        if t.get("id") == WD_PRINT:
+            return "print"
+        if t.get("id") == WD_HAND:
+            return "hand"
+        label = (t.get("label") or "").lower()
+    elif isinstance(t, str):
+        label = t.lower()
+    else:
+        return "unknown"
+
+    if "käsikiri" in label or "manuscript" in label:
+        return "hand"
+    if "trükis" in label or "printed" in label:
+        return "print"
+    return "unknown"
 
 
 def read_page_status(json_path: Path) -> str | None:
@@ -66,15 +121,33 @@ def main():
     skipped_status = 0
     skipped_no_txt = 0
     skipped_empty = 0
+    repaired_crossed = 0
 
     works = sorted(
         d for d in RAW_DIR.iterdir()
         if d.is_dir() and not d.name.startswith("_") and not d.name.startswith(".")
+        and d.name != "config"          # VUTT-i seadistuskaust, mitte teos
+        and any(d.glob("*.jpg"))        # ilma piltideta kaust pole teos
     )
 
     print(f"Töötlen {len(works)} teost kataloogist {RAW_DIR}/...")
+    print(f"Materjali tüüp: --type {MATERIAL}"
+          + ("  (+ tundmatud kaasa)" if INCLUDE_UNKNOWN else ""))
+
+    type_pages = {"print": 0, "hand": 0, "unknown": 0}   # välja jäetud lehed
+    unknown_works = []
 
     for work_dir in works:
+        wtype = read_work_type(work_dir)
+        if wtype == "unknown" and work_dir not in unknown_works:
+            unknown_works.append(work_dir.name)
+
+        keep = (
+            MATERIAL == "all"
+            or wtype == MATERIAL
+            or (wtype == "unknown" and INCLUDE_UNKNOWN)
+        )
+
         jpg_files = sorted(
             f for f in work_dir.iterdir()
             if f.suffix.lower() == ".jpg" and not f.name.startswith("_")
@@ -105,7 +178,22 @@ def main():
                 skipped_empty += 1
                 continue
 
+            # Tüübifilter alles siin, et loendur kajastaks päriselt kõlblikke
+            # lehti, mitte ka neid, mis oleks niikuinii staatuse tõttu välja
+            # kukkunud – muidu näitab statistika petlikult suuri numbreid.
+            if not keep:
+                type_pages[wtype] += 1
+                continue
+
+            transcription = unwrap_tags(transcription)
+            # Ristuv pesastus enne tühjade koristust: parandus tekitab ise
+            # tühje paare (<cs></cs>), mille remove_empty_tags siis ära võtab.
+            fixed = fix_crossed_tags(transcription)
+            if fixed != transcription:
+                repaired_crossed += 1
+                transcription = fixed
             transcription = remove_empty_m_tags(transcription)
+            transcription = remove_empty_tags(transcription)
             if not transcription:
                 skipped_empty += 1
                 continue
@@ -125,6 +213,19 @@ def main():
     print(f"  Vahele jäetud (staatus):   {skipped_status}")
     print(f"  Vahele jäetud (ei TXT):    {skipped_no_txt}")
     print(f"  Vahele jäetud (tühi tekst):{skipped_empty}")
+    print(f"  Parandatud (ristuv pesastus): {repaired_crossed}")
+    excluded = {k: v for k, v in type_pages.items() if v}
+    if excluded:
+        print(f"  Vahele jäetud (vale tüüp): "
+              + ", ".join(f"{k}={v}" for k, v in excluded.items()))
+    if unknown_works and not INCLUDE_UNKNOWN:
+        print(f"\n  NB! {len(unknown_works)} teosel puudub VUTT-is type-väli, "
+              f"seega jäid välja ({type_pages['unknown']} Valmis lehte).")
+        print(f"      Paranda VUTT-is või kasuta --include-unknown. Teosed:")
+        for w in unknown_works[:10]:
+            print(f"        {w}")
+        if len(unknown_works) > 10:
+            print(f"        ... ja veel {len(unknown_works) - 10}")
 
     if DRY_RUN:
         print("\n--stats: faile ei kirjutata.")

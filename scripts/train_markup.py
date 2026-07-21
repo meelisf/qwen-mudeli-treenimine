@@ -33,7 +33,9 @@ from trl import SFTTrainer, SFTConfig
 from unsloth.trainer import UnslothVisionDataCollator
 from PIL import Image as PILImage
 from prompt import INSTRUCTION
-from convert_marginalia import remove_empty_m_tags
+from convert_marginalia import (
+    remove_empty_m_tags, unwrap_tags, fix_crossed_tags, remove_empty_tags,
+)
 
 TEST_MODE = "--test" in sys.argv
 if TEST_MODE:
@@ -141,7 +143,12 @@ class LehekyljAndmestik:
                     if not isinstance(t, str) or not t.strip():
                         skipped += 1
                         continue
-                    t_clean = remove_empty_m_tags(t)
+                    # Sama puhastusahel ka siin: olemasolevad metadata.csv-d on
+                    # ehitatud enne nende sammude lisamist ja sisaldavad veel
+                    # <annN> tage ning ristuvat pesastust.
+                    t_clean = remove_empty_tags(
+                        remove_empty_m_tags(fix_crossed_tags(unwrap_tags(t)))
+                    )
                     if not t_clean:
                         skipped += 1
                         continue
@@ -212,7 +219,7 @@ trainer = SFTTrainer(
         gradient_accumulation_steps=4 if TEST_MODE else 8,
         warmup_steps=2 if TEST_MODE else 10,
         max_steps=5 if TEST_MODE else -1,
-        num_train_epochs=1 if TEST_MODE else 1,
+        num_train_epochs=1 if TEST_MODE else 2,
         learning_rate=1e-4,     # inkrementaalne: väiksem LR kui etapp 1 (2e-4)
         logging_steps=1 if TEST_MODE else 10,
         optim="adamw_8bit",

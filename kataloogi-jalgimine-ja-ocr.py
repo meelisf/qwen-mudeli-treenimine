@@ -79,11 +79,11 @@ BASE_OCR_KAUST = "/home/mf/Dokumendid/LLM/AUTO-OCR"
 
 # Iga tüübi jaoks eraldi alamkaust ja mudel
 MODEL_CONFIGS = {
-    "print": "models/qwen3.5-ocr-lora",
+    "print": "models/qwen3.5-ocr-markup-20260720",
     "hand":  "models/qwen3.5-ocr-kurrent-20260602",
 }
 
-BATCH_SIZE = 3
+BATCH_SIZE = 4
 
 PDF_DPI = 300
 
@@ -167,9 +167,13 @@ def ensure_model(model_type: str):
 
     model_path = MODEL_CONFIGS[model_type]
     logger.info(f"Laen mudelit '{model_type}': {model_path} ...")
+    # bf16, mitte 4-bit: 4-bit on treeningu mälusääst, inferentsil ainult aeglustab
+    # (mõõdetud 21.07.2026: bf16 1.5x kiirem; batch 4 tipp 24.6 GB / 32.6 GB,
+    #  ei kasva genereerimise pikkusega, sest GatedDeltaNet olek on konstantne)
     m, tok = FastVisionModel.from_pretrained(
         model_name=model_path,
-        load_in_4bit=True,
+        load_in_4bit=False,
+        dtype=torch.bfloat16,
     )
     tok = _setup_tokenizer(tok)
     FastVisionModel.for_inference(m)

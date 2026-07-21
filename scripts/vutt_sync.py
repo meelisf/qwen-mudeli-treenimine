@@ -31,7 +31,7 @@ def main():
         "--exclude=.git/",
         "--exclude=uploads/",
         "--include=*/",          # kausta struktuur
-        "--include=*.jpg",
+        "--include=*.jpg",       # mis saab png-dest jne?
         "--include=*.txt",
         "--include=*.json",
         "--exclude=*",           # kõik muu välja

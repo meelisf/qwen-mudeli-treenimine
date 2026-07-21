@@ -171,6 +171,99 @@ def remove_empty_m_tags(text: str) -> str:
     return result.strip()
 
 
+#: Tagid, mis VUTT-ist tulevad, aga ei kuulu treeningjuhisesse (prompt.py).
+#: Sisu on päris lehetekst (käsikirjalised parandused trükitud lehel), seega
+#: eemaldatakse ainult märgend ise, sisu jääb alles. Ühtlasi parandab see
+#: katkise pesastuse: just <annN> on see, mis lõikub üle <i>/<cs>/<m> piiride.
+UNWRAP_TAGS = ("ann1", "ann2", "ann3", "ann4")
+
+#: <noodid> jääb ALLES – see märgib kohta, kus lehel on noodikiri. Ilma selleta
+#: satub mudel noote nähes segadusse ja hakkab neid transkribeerida püüdma;
+#: märgendiga paneb ta märke ja liigub edasi.
+
+
+def unwrap_tags(text: str, tags: tuple = UNWRAP_TAGS) -> str:
+    """Eemaldab nimetatud tagid, säilitades nende sisu.
+
+    <ann1>Schmolentzkow</ann1>/ Twertſky/  →  Schmolentzkow/ Twertſky/
+    """
+    for tag in tags:
+        text = re.sub(rf"</?{tag}\s*/?>", "", text)
+    return text
+
+
+#: Märgendid ilma paarilise sulgejata – neid pesastuse kontroll ei arvesta.
+#: <pb/> on isesulguv, <noodid> on üksik marker (vt selgitust ülal).
+_UNPAIRED = ("pb", "noodid")
+
+_TAG_RE = re.compile(r"<(/?)([a-zA-Z0-9]+)\s*(/?)>")
+
+
+def fix_crossed_tags(text: str) -> str:
+    """Parandab ristuva pesastuse, järjestades sulgejad avamisjärjekorda.
+
+    VUTT-i transkriptsioonides on levinud näpukas, kus sisemine ja välimine
+    märgend suletakse vales järjekorras – eriti poolitatud sõnades ja
+    marginaaliaridades:
+
+        <i>L. Baro in <cs>Ekeby⸗</i></cs>   →  <i>L. Baro in <cs>Ekeby⸗</cs></i>
+        <m><i>traria.</m></i>               →  <m><i>traria.</i></m>
+
+    Kui sulgeja vastab mõnele pinus allpool olevale avajale, suletakse kõik
+    selle peal olevad märgendid ja avatakse pärast uuesti – nii säilib
+    algne kavatsetud ulatus. Tekkivad tühjad paarid koristab
+    remove_empty_tags().
+
+    Avajata sulgejaid ja sulgejata avajaid EI puudutata: need on
+    leheküljepiiri ületavad jooksud (kaldkiri algab eelmisel lehel), mis on
+    lehekaupa transkribeerimisel täiesti õiguspärased.
+    """
+    out = []
+    stack = []
+    pos = 0
+    for m in _TAG_RE.finditer(text):
+        closing, name, selfc = m.group(1), m.group(2).lower(), m.group(3)
+        out.append(text[pos:m.start()])
+        pos = m.end()
+
+        if name in _UNPAIRED or selfc:
+            out.append(m.group(0))
+        elif not closing:
+            stack.append(name)
+            out.append(m.group(0))
+        elif stack and stack[-1] == name:
+            stack.pop()
+            out.append(m.group(0))
+        elif name in stack:
+            # Ristuv: sulge vahepealsed, sulge see, ava vahepealsed uuesti.
+            idx = len(stack) - 1 - stack[::-1].index(name)
+            inner = stack[idx + 1:]
+            out.append("".join(f"</{x}>" for x in reversed(inner)))
+            out.append(f"</{name}>")
+            out.append("".join(f"<{x}>" for x in inner))
+            del stack[idx]
+        else:
+            out.append(m.group(0))   # avajata sulgeja – lehepiiri jooks
+
+    out.append(text[pos:])
+    return "".join(out)
+
+
+def remove_empty_tags(text: str) -> str:
+    """Eemaldab sisuta märgendipaarid (<i></i>, <cs></cs>, <m><i></i></m> …).
+
+    Korratakse püsipunktini, et ka pesastatud tühjad plokid kaoksid.
+    <pb/> ja <noodid> jäävad puutumata – neil pole paarilist.
+    """
+    prev = None
+    while prev != text:
+        prev = text
+        text = re.sub(r"<([a-zA-Z0-9]+)>\s*</\1>", "", text)
+    text = re.sub(r"[ \t]+\n", "\n", text)
+    text = re.sub(r"\n{3,}", "\n\n", text)
+    return text.strip()
+
+
 def main() -> None:
     args = [a for a in sys.argv[1:] if not a.startswith("--")]
     test_mode = "--test" in sys.argv

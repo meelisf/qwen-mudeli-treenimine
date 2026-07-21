@@ -5,6 +5,9 @@ __pycache__/
 *.egg-info/
 unsloth_compiled_cache/
 
+# Saladused – HF_TOKEN jm
+.env
+
 # Logid
 *.log
 
@@ -15,9 +18,18 @@ data/vutt/images/
 data/vutt-raw/
 data/raw/
 data/*/images/
+# testpildid (print/ + hand/)
+data/test/
+# tooreskaneeringud + lõigatud veerud
+data/freilingshausen-2col/
 
 # Treeninguandmed – CSV-d jäävad repposse (väikesed, kasulikud)
 # data/**/*.csv  <-- ei välista
+# ...v.a Kurrenti omad: 41 MB, ja ilma piltideta pole neist kasu
+data/kurrent/*.csv
+
+# varukoopiad (metadata.bak jms)
+*.bak
 
 # Mudelicheckpointid ja treenitud mudelid
 models/

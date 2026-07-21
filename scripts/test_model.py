@@ -3,8 +3,9 @@
 Qwen3.5 OCR mudeli testimine
 
 Käivitamine:
-  python scripts/test_model.py                          # kõik data/test/ pildid, aktiivne mudel
+  python scripts/test_model.py                          # kõik data/test/print/ pildid, aktiivne mudel
   python scripts/test_model.py data/test/pilt.jpg       # üks pilt
+  python scripts/test_model.py --dir data/test/hand --model models/qwen3.5-ocr-kurrent-20260602
   python scripts/test_model.py --model models/qwen3.5-ocr-markup-20260526
   python scripts/test_model.py --model models/qwen3.5-ocr-markup-20260526 data/test/pilt.jpg
 
@@ -30,6 +31,7 @@ from prompt import INSTRUCTION
 # ---------------------------------------------------------------------------
 
 MODEL_PATH = "models/qwen3.5-ocr-lora"
+TEST_DIR = "data/test/print"  # print/ = trükis, hand/ = käsikiri (nagu AUTO-OCR-is)
 IMAGE_PATHS = []
 BATCH_SIZE = 3
 THINKING = False
@@ -44,6 +46,12 @@ while i < len(args):
     elif args[i].startswith("--model="):
         MODEL_PATH = args[i].split("=", 1)[1]
         i += 1
+    elif args[i] == "--dir" and i + 1 < len(args):
+        TEST_DIR = args[i + 1]
+        i += 2
+    elif args[i].startswith("--dir="):
+        TEST_DIR = args[i].split("=", 1)[1]
+        i += 1
     elif args[i] == "--thinking":
         THINKING = True
         i += 1
@@ -55,7 +63,7 @@ while i < len(args):
         i += 1
 
 if not IMAGE_PATHS:
-    test_dir = Path("data/test")
+    test_dir = Path(TEST_DIR)
     if not test_dir.exists():
         print(f"Viga: testpiltide kaust ei leitud: {test_dir}")
         sys.exit(1)
@@ -88,7 +96,8 @@ if not torch.cuda.is_available():
 
 model, tokenizer = FastVisionModel.from_pretrained(
     model_name=MODEL_PATH,
-    load_in_4bit=True,
+    load_in_4bit=False,
+    dtype=torch.bfloat16,
     use_gradient_checkpointing="unsloth",
 )
 
