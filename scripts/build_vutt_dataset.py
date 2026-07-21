@@ -21,6 +21,12 @@ from pathlib import Path
 from convert_marginalia import (
     remove_empty_m_tags, unwrap_tags, fix_crossed_tags, remove_empty_tags,
 )
+from imaging import prepare_image, MAX_PIXELS
+
+# Piltide eelskaleerimine on OPT-IN, sest see on inferentsiga seotud:
+# eelskaleeritud andmestikul treenitud mudel eeldab, et ka inferents
+# skaleerib fit_to_budget()-iga. Vt SPIKKER.md "Piltide eelskaleerimine".
+RESIZE_IMAGES = "--resize" in sys.argv
 
 DRY_RUN   = "--stats" in sys.argv
 RAW_DIR   = Path("data/vutt-raw")
@@ -238,25 +244,40 @@ def main():
     # Loo väljundkataloog
     IMG_DIR.mkdir(parents=True, exist_ok=True)
 
-    # Kopeeri pildid ja kirjuta CSV
-    copied = 0
-    skipped_exists = 0
+    # Kopeeri/skaleeri pildid ja kirjuta CSV
+    counts = {"resized": 0, "copied": 0, "kept": 0}
     with open(CSV_PATH, "w", encoding="utf-8", newline="") as f:
         writer = csv.writer(f)
         writer.writerow(["failinimi", "transkriptsioon"])
 
         for p in pairs:
             dst = IMG_DIR / p["img_name"]
-            if not dst.exists():
+            if RESIZE_IMAGES:
+                counts[prepare_image(p["img_src"], dst)] += 1
+            elif not dst.exists():
                 shutil.copy2(p["img_src"], dst)
-                copied += 1
+                counts["copied"] += 1
             else:
-                skipped_exists += 1
+                counts["kept"] += 1
 
             writer.writerow([f"images/{p['img_name']}", p["transkriptsioon"]])
 
     print(f"\nValmis!")
-    print(f"  Pildid kopeeritud: {copied} (olemas juba: {skipped_exists})")
+    if RESIZE_IMAGES:
+        print(f"  Pildid: skaleeritud {counts['resized']}, "
+              f"kopeeritud {counts['copied']}, juba korras {counts['kept']}")
+        print(f"  Eelarve: {MAX_PIXELS:,} px (~{MAX_PIXELS // 1024} visuaaltokenit)")
+        print()
+        print("  !! --resize: see andmestik on EELSKALEERITUD.")
+        print("     Sellel treenitud mudel eeldab, et ka inferents kutsub")
+        print("     imaging.fit_to_budget(). Lülita kataloogi-jalgimine-ja-ocr.py")
+        print("     ja test_model.py ümber SAMAL AJAL kui uue mudeli aktiveerid,")
+        print("     muidu tekib treening/inferents-nihe.")
+    else:
+        print(f"  Pildid kopeeritud: {counts['copied']} "
+              f"(olemas juba: {counts['kept']})")
+        print(f"  Täissuuruses – protsessor skaleerib treeningu ajal.")
+        print(f"  Kiirem torujuhe: --resize (vt SPIKKER.md)")
     print(f"  CSV: {CSV_PATH} ({len(pairs)} rida)")
     print(f"\nJärgmine samm: python scripts/train_markup.py [--test]")
 

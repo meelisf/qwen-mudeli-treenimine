@@ -33,6 +33,7 @@ from unsloth import FastVisionModel
 from natsort import natsorted
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "scripts"))
 from prompt import INSTRUCTION
+from imaging import MAX_PIXELS
 
 # --- 0. LOGIMINE JA SIGNAALID ---
 
@@ -136,8 +137,11 @@ tokenizer = None
 
 
 def _setup_tokenizer(tok):
+    # NB! Kui andmestik ehitatakse --resize lipuga, ei piisa sellest üksi:
+    # siis peab ka siin enne protsessorit kutsuma imaging.fit_to_budget(),
+    # muidu treenib mudel LANCZOS-pilte ja näeb inferentsil BICUBIC-pilte.
     tok.image_processor.size = {
-        "longest_edge": 5_120_000,
+        "longest_edge": MAX_PIXELS,
         "shortest_edge": tok.image_processor.size.get("shortest_edge", 65536),
     }
     if tok.chat_template and "enable_thinking" in tok.chat_template:

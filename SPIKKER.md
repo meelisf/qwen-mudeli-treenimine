@@ -109,6 +109,36 @@ Lehed, mida parandus ainult vormistab ja mis vajavad VUTT-is käsitsi
 parandust (liigne `<m>` keset sõna, dubleeritud `<i>`), on loetletud failis
 `docs/katkised-lehed-20260721.txt`.
 
+### Piltide eelskaleerimine (`--resize`) – lugege enne kasutamist
+
+Meie skaneeringud on mediaanis ~15 MP, eelarve on 5,12 MP. Vaikimisi läheb
+täissuuruses pilt kettalt protsessorisse, mis skaleerib ta **igal epohhil
+uuesti** – mõõdetuna 310 ms lehe kohta, ja see paneb GPU pauside ajal
+seisma. `--resize` teeb selle töö ühe korra ära, ehitamise ajal:
+
+```bash
+python scripts/build_vutt_dataset.py --resize
+```
+
+Mõõdetud võit: **310 ms → 31 ms lehe kohta (~10x)**, maht 1,82 GB → ~75%.
+
+**Aga see seob andmestiku inferentsiga.** Eelskaleerimine kasutab LANCZOS-i,
+protsessor BICUBIC-ut; nende vahe on 42–47 dB PSNR ehk sama suurusjärk mis
+JPEG-i ümberkodeerimine. Kui treening näeb üht ja inferents teist, on tegu
+treening/inferents-nihkega.
+
+Seega **`--resize` andmestikul treenitud mudeli aktiveerimisel tuleb SAMAL
+AJAL** lisada `imaging.fit_to_budget()` kutse enne protsessorit nii failis
+`kataloogi-jalgimine-ja-ocr.py` kui `scripts/test_model.py`. Mõlemas on
+kommentaar täpses kohas.
+
+Eelarve `MAX_PIXELS` elab ühes kohas: `scripts/imaging.py`.
+
+| Mudel | Andmestik | Inferents peab olema |
+|---|---|---|
+| kuni `20260721` (k.a) | täissuuruses | nagu praegu (protsessor skaleerib) |
+| `--resize` andmestikuga treenitud | eelskaleeritud | `fit_to_budget()` enne protsessorit |
+
 ### 3. Treenimine
 ```bash
 sudo systemctl stop ocr-service          # vabasta GPU mälu!

@@ -25,6 +25,7 @@ os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"
 from unsloth import FastVisionModel
 from PIL import Image as PILImage
 from prompt import INSTRUCTION
+from imaging import MAX_PIXELS
 
 # ---------------------------------------------------------------------------
 # Argumendid
@@ -102,8 +103,10 @@ model, tokenizer = FastVisionModel.from_pretrained(
 )
 
 tokenizer.truncation = False
+# Vt kommentaari kataloogi-jalgimine-ja-ocr.py-s: --resize andmestiku puhul
+# tuleb siia lisada imaging.fit_to_budget() kutse enne protsessorit.
 tokenizer.image_processor.size = {
-    "longest_edge": 5_120_000,
+    "longest_edge": MAX_PIXELS,
     "shortest_edge": tokenizer.image_processor.size.get("shortest_edge", 65536),
 }
 

@@ -36,6 +36,7 @@ from prompt import INSTRUCTION
 from convert_marginalia import (
     remove_empty_m_tags, unwrap_tags, fix_crossed_tags, remove_empty_tags,
 )
+from imaging import MAX_PIXELS
 
 TEST_MODE = "--test" in sys.argv
 if TEST_MODE:
@@ -109,11 +110,11 @@ model, tokenizer = FastVisionModel.from_pretrained(
 tokenizer.truncation = False
 
 tokenizer.image_processor.size = {
-    "longest_edge": 5_120_000,
+    "longest_edge": MAX_PIXELS,
     "shortest_edge": tokenizer.image_processor.size.get("shortest_edge", 65536),
 }
-print(f"Pildi max_pixels: {tokenizer.image_processor.size['longest_edge']:,} px "
-      f"→ ~{5_120_000 // 1024} visuaaltokenit")
+print(f"Pildi max_pixels: {MAX_PIXELS:,} px "
+      f"→ ~{MAX_PIXELS // 1024} visuaaltokenit")
 
 # Checkpoint sisaldab juba LoRA adaptereid – get_peft_model() EI tohi järgneda
 print("Mudel laaditud etapp 1 checkpoindist (LoRA adapterid juba küljes).")
