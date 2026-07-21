@@ -23,7 +23,19 @@ watch -n2 "paste <(cat /sys/class/thermal/thermal_zone*/type) \
 ```bash
 sudo nvidia-smi -pl 450                                              # GPU 450W (vaikimisi 575W)
 echo 1 | sudo tee /sys/devices/system/cpu/intel_pstate/no_turbo     # CPU turbo välja
+
+# SSH võti agenti (küsib parooli korra) – ilma selleta ei tööta
+# git push ega vutt_sync.py rsync automaatselt
+SSH_AUTH_SOCK=/run/user/1000/openssh_agent ssh-add ~/.ssh/id_ed25519
 ```
+
+Kontroll, kas võti on agendis:
+
+```bash
+SSH_AUTH_SOCK=/run/user/1000/openssh_agent ssh-add -l
+```
+
+`The agent has no identities` = võti on laadimata, ssh hakkab parooli küsima.
 
 ---
 
