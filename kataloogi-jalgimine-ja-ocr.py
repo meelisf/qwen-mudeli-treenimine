@@ -80,7 +80,7 @@ BASE_OCR_KAUST = "/home/mf/Dokumendid/LLM/AUTO-OCR"
 
 # Iga tüübi jaoks eraldi alamkaust ja mudel
 MODEL_CONFIGS = {
-    "print": "models/qwen3.5-ocr-markup-20260721",
+    "print": "models/qwen3.5-ocr-markup-20260720",
     "hand":  "models/qwen3.5-ocr-kurrent-20260602",
 }
 
