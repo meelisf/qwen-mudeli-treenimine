@@ -80,8 +80,34 @@ Tulemus: `data/vutt-raw/` (1260+ teost)
 ```bash
 python scripts/build_vutt_dataset.py --stats   # statistika
 python scripts/build_vutt_dataset.py           # kirjuta failid
+python scripts/build_vutt_dataset.py --type hand    # käsikirjad (vaikimisi print)
 ```
 Tulemus: `data/vutt/metadata.csv` + `data/vutt/images/`
+
+Trüki- ja käsikirjamudelit treenitakse eraldi, seega `--type` filtreerib
+teose `_metadata.json` järgi (Wikidata `Q1261026` = trükis, `Q87167` =
+käsikiri). Kui statistika kurdab puuduva `type` välja üle, tuleb see
+VUTT-is ära täita — muidu jäävad need teosed vaikselt välja.
+
+**Puhastusahel — transkriptsiooni muudetakse automaatselt:**
+
+| Samm | Mida teeb |
+|---|---|
+| `unwrap_tags` | `<ann1>`–`<ann4>` märgend maha, sisu alles |
+| `fix_crossed_tags` | ristuv pesastus `<i>..<cs>X</i></cs>` → `<i>..<cs>X</cs></i>` |
+| `remove_empty_m_tags` + `remove_empty_tags` | tühjad märgendipaarid välja |
+| tühja teksti kontroll | 0-baidised "Valmis" lehed jäävad välja |
+
+Sama ahel jookseb ka `train_markup.py` laadimisel, et vanemad CSV-d samuti
+puhastuks. **NB!** See tähendab, et treeningandmed ei ole bait-bait samad
+mis VUTT-is — kui mudeli väljundis midagi kummalist paistab, pea seda meeles.
+
+Avajata sulgejaid ja sulgejata avajaid EI parandata: need on leheküljepiiri
+ületavad jooksud (kaldkiri algab eelmisel lehel) ja on õiguspärased.
+
+Lehed, mida parandus ainult vormistab ja mis vajavad VUTT-is käsitsi
+parandust (liigne `<m>` keset sõna, dubleeritud `<i>`), on loetletud failis
+`docs/katkised-lehed-20260721.txt`.
 
 ### 3. Treenimine
 ```bash
