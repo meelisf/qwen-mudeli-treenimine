@@ -40,18 +40,44 @@ from pathlib import Path
 _MULTILINE_M = re.compile(r"<m>(.*?)</m>", re.DOTALL)
 
 
-def _normalize_multiline_m(text: str) -> str:
-    """Jagab mitmerealised <m>...</m> plokid järjestikusteks ühereallisteks <m> kirjeteks."""
+def normalize_multiline_m_tags(text: str) -> str:
+    """Jagab mitmerealised <m>...</m> plokid üherealisteks <m> kirjeteks.
+
+    VUTT-i kasutajad on marginaale märgendanud kahel viisil: kas üks <m>
+    terve ploki ümber või eraldi <m> iga rea ümber. Treeningprompt nõuab
+    viimast vormi, seega normaliseerivad andmestiku ehitaja ja treener selle
+    funktsiooniga mõlemad variandid samale kujule.
+    """
+    # Mõnel lehel on plokivormilt reavormile üleminekul vana välimine
+    # avamärgend alles jäänud: <m><m>rida</m>. <m> ei tohi pesastuda, seega
+    # eemaldame vahetult järgmise <m> ees olevad üleliigsed avajad.
+    text = re.sub(r"<m>(?=\s*<m>)", "", text)
+
     def _split(match: re.Match) -> str:
         content = match.group(1)
         if "\n" not in content:
             return match.group(0)
-        stripped = content.strip()
-        fmt_m = re.match(r"^<([ib])>(.*)</\1>$", stripped, re.DOTALL)
-        if fmt_m:
-            tag, inner = fmt_m.group(1), fmt_m.group(2)
-            return "\n".join(f"<m><{tag}>{line}</{tag}></m>" for line in inner.split("\n"))
-        return "\n".join(f"<m>{line}</m>" for line in content.split("\n"))
+
+        lines = content.split("\n")
+        first = lines[0].strip()
+        last = lines[-1].strip()
+
+        # Kui üks <i>/<b> paar ümbritseb tervet mitmerealist plokki,
+        # korratakse vormindust igal real. Ära aja seda segi variandiga,
+        # kus iga rida on juba eraldi vormindatud (<i>A</i>\n<i>B</i>):
+        # sel juhul sisaldab esimene rida juba sulgejat.
+        outer = re.match(r"^<([ib])>", first)
+        if outer:
+            tag = outer.group(1)
+            if f"</{tag}>" not in first and last.endswith(f"</{tag}>"):
+                lines[0] = lines[0].replace(f"<{tag}>", "", 1)
+                pos = lines[-1].rfind(f"</{tag}>")
+                lines[-1] = lines[-1][:pos] + lines[-1][pos + len(tag) + 3:]
+                return "\n".join(
+                    f"<m><{tag}>{line}</{tag}></m>" for line in lines
+                )
+
+        return "\n".join(f"<m>{line}</m>" for line in lines)
 
     return _MULTILINE_M.sub(_split, text)
 
@@ -94,7 +120,7 @@ def convert(text: str) -> str:
 
     <pb/> piiri arvestatakse: iga lehe osa saab oma <m> plokid vahetult oma teksti järele.
     """
-    text = _normalize_multiline_m(text)
+    text = normalize_multiline_m_tags(text)
 
     if not (_M_LINE_RE.search(text) or _INLINE_M.search(text)):
         return text
@@ -249,6 +275,62 @@ def fix_crossed_tags(text: str) -> str:
     return "".join(out)
 
 
+def balance_line_m_tags(text: str) -> str:
+    """Lisab üksikule marginaalireale puuduva `<m>` avaja või sulgeja.
+
+    Pärast mitmerealiste plokkide jagamist peab iga `<m>` paar asuma ühel
+    real. See lubab parandada kasutaja sisestuse nagu `<i>Ratio.</i></m>` ilma
+    leheküljepiiri ületavaid `<i>`/`<cs>` märgendeid puutumata.
+    """
+    result = []
+    for line in text.split("\n"):
+        opens = line.count("<m>")
+        closes = line.count("</m>")
+        if closes > opens:
+            line = "<m>" * (closes - opens) + line
+        elif opens > closes:
+            line = line + "</m>" * (opens - closes)
+        result.append(line)
+    return "\n".join(result)
+
+
+def flatten_redundant_nested_tags(text: str) -> str:
+    """Eemaldab sama märgendi üleliigse pesastuse, sisu säilitades.
+
+    Kasutajate redigeerimisest võib jääda näiteks `<m>3<m>.</m></m>` või
+    `<i><i>tekst</i></i>`. Sama semantilise märgendi pesastamisel pole VUTT-i
+    väljundis tähendust; tulemused on vastavalt `<m>3.</m>` ja
+    `<i>tekst</i>`. Ristuv pesastus peab olema enne selle funktsiooni
+    kutsumist parandatud.
+    """
+    out = []
+    stack: list[tuple[str, bool]] = []  # (nimi, kas märgend kirjutati välja)
+    pos = 0
+
+    for match in _TAG_RE.finditer(text):
+        closing, name, selfc = match.group(1), match.group(2).lower(), match.group(3)
+        out.append(text[pos:match.start()])
+        pos = match.end()
+
+        if name in _UNPAIRED or selfc:
+            out.append(match.group(0))
+        elif not closing:
+            emit = not any(open_name == name for open_name, _ in stack)
+            stack.append((name, emit))
+            if emit:
+                out.append(match.group(0))
+        elif stack and stack[-1][0] == name:
+            _, emit = stack.pop()
+            if emit:
+                out.append(match.group(0))
+        else:
+            # Avajata või endiselt vigaselt pesastatud sulgeja: säilita.
+            out.append(match.group(0))
+
+    out.append(text[pos:])
+    return "".join(out)
+
+
 def remove_empty_tags(text: str) -> str:
     """Eemaldab sisuta märgendipaarid (<i></i>, <cs></cs>, <m><i></i></m> …).
 
@@ -262,6 +344,29 @@ def remove_empty_tags(text: str) -> str:
     text = re.sub(r"[ \t]+\n", "\n", text)
     text = re.sub(r"\n{3,}", "\n\n", text)
     return text.strip()
+
+
+def clean_markup(text: str) -> str:
+    """Viib VUTT markup'i treeningu kanoonilisele kujule.
+
+    Parandused käivad püsipunktini, sest ühe vigase pesastuse lamendamine
+    võib paljastada järgmise ristuva või tühja märgendipaari. Funktsiooni
+    kasutavad nii andmestiku ehitaja kui treener, et CSV ja treeningusse
+    jõudev tekst oleksid identsed.
+    """
+    text = unwrap_tags(text)
+    for _ in range(10):
+        cleaned = fix_crossed_tags(text)
+        cleaned = normalize_multiline_m_tags(cleaned)
+        cleaned = flatten_redundant_nested_tags(cleaned)
+        cleaned = normalize_multiline_m_tags(cleaned)
+        cleaned = balance_line_m_tags(cleaned)
+        cleaned = remove_empty_m_tags(cleaned)
+        cleaned = remove_empty_tags(cleaned)
+        if cleaned == text:
+            return cleaned
+        text = cleaned
+    raise RuntimeError("Markup'i puhastus ei koondunud 10 iteratsiooniga")
 
 
 def main() -> None:

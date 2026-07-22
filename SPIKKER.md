@@ -95,7 +95,12 @@ VUTT-is ära täita — muidu jäävad need teosed vaikselt välja.
 |---|---|
 | `unwrap_tags` | `<ann1>`–`<ann4>` märgend maha, sisu alles |
 | `fix_crossed_tags` | ristuv pesastus `<i>..<cs>X</i></cs>` → `<i>..<cs>X</cs></i>` |
+| `normalize_multiline_m_tags` (1) | mitmerealine `<m>A\nB</m>` → `<m>A</m>\n<m>B</m>`; eemaldab ka vigased pesastatud avajad `<m><m>A</m>` |
+| `flatten_redundant_nested_tags` | sama tagi topeltpesastus `<m>3<m>.</m></m>` → `<m>3.</m>` ja `<i><i>X</i></i>` → `<i>X</i>` |
+| `normalize_multiline_m_tags` (2) | jagab uuesti plokid, mille vigase pesastuse lamendamine muutis mitmerealiseks |
+| `balance_line_m_tags` | lisab üksikul marginaalireal puuduva `<m>` avaja või sulgeja |
 | `remove_empty_m_tags` + `remove_empty_tags` | tühjad märgendipaarid välja |
+| `clean_markup` | kordab eelnevat ahelat püsipunktini; ehitaja ja treener kasutavad sama funktsiooni |
 | tühja teksti kontroll | 0-baidised "Valmis" lehed jäävad välja |
 
 Sama ahel jookseb ka `train_markup.py` laadimisel, et vanemad CSV-d samuti

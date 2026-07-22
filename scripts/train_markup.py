@@ -33,9 +33,7 @@ from trl import SFTTrainer, SFTConfig
 from unsloth.trainer import UnslothVisionDataCollator
 from PIL import Image as PILImage
 from prompt import INSTRUCTION
-from convert_marginalia import (
-    remove_empty_m_tags, unwrap_tags, fix_crossed_tags, remove_empty_tags,
-)
+from convert_marginalia import clean_markup
 from imaging import MAX_PIXELS
 
 TEST_MODE = "--test" in sys.argv
@@ -147,9 +145,7 @@ class LehekyljAndmestik:
                     # Sama puhastusahel ka siin: olemasolevad metadata.csv-d on
                     # ehitatud enne nende sammude lisamist ja sisaldavad veel
                     # <annN> tage ning ristuvat pesastust.
-                    t_clean = remove_empty_tags(
-                        remove_empty_m_tags(fix_crossed_tags(unwrap_tags(t)))
-                    )
+                    t_clean = clean_markup(t)
                     if not t_clean:
                         skipped += 1
                         continue
@@ -167,7 +163,7 @@ class LehekyljAndmestik:
         if skipped:
             print(f"  Hoiatus: {skipped} rida jäeti vahele.")
         if cleaned_m:
-            print(f"  Puhastatud tühjad <m> tagid: {cleaned_m} leheküljel.")
+            print(f"  Normaliseeritud/puhastatud markup: {cleaned_m} leheküljel.")
 
         print(f"  Andmestik: {len(self.samples)} näidet ({len(sources)} allikast)")
 

@@ -18,9 +18,7 @@ import shutil
 import re
 from pathlib import Path
 
-from convert_marginalia import (
-    remove_empty_m_tags, unwrap_tags, fix_crossed_tags, remove_empty_tags,
-)
+from convert_marginalia import clean_markup
 from imaging import prepare_image, MAX_PIXELS
 
 # Piltide eelskaleerimine on OPT-IN, sest see on inferentsiga seotud:
@@ -127,7 +125,7 @@ def main():
     skipped_status = 0
     skipped_no_txt = 0
     skipped_empty = 0
-    repaired_crossed = 0
+    cleaned_markup = 0
 
     works = sorted(
         d for d in RAW_DIR.iterdir()
@@ -191,15 +189,10 @@ def main():
                 type_pages[wtype] += 1
                 continue
 
-            transcription = unwrap_tags(transcription)
-            # Ristuv pesastus enne tühjade koristust: parandus tekitab ise
-            # tühje paare (<cs></cs>), mille remove_empty_tags siis ära võtab.
-            fixed = fix_crossed_tags(transcription)
-            if fixed != transcription:
-                repaired_crossed += 1
-                transcription = fixed
-            transcription = remove_empty_m_tags(transcription)
-            transcription = remove_empty_tags(transcription)
+            cleaned = clean_markup(transcription)
+            if cleaned != transcription:
+                cleaned_markup += 1
+            transcription = cleaned
             if not transcription:
                 skipped_empty += 1
                 continue
@@ -219,7 +212,7 @@ def main():
     print(f"  Vahele jäetud (staatus):   {skipped_status}")
     print(f"  Vahele jäetud (ei TXT):    {skipped_no_txt}")
     print(f"  Vahele jäetud (tühi tekst):{skipped_empty}")
-    print(f"  Parandatud (ristuv pesastus): {repaired_crossed}")
+    print(f"  Normaliseeritud/puhastatud markup: {cleaned_markup}")
     excluded = {k: v for k, v in type_pages.items() if v}
     if excluded:
         print(f"  Vahele jäetud (vale tüüp): "
