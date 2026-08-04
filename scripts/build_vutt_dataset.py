@@ -2,12 +2,16 @@
 """
 VUTT andmestiku ettevalmistamine treeninguks
 
-Loeb data/vutt-raw/ kataloogist kõik teosed, filtreerib leheküljed
-staatusega "Valmis" ja loob data/vutt/metadata.csv + kopeerib pildid.
+Loeb lähtekataloogist kõik teosed, filtreerib leheküljed staatusega
+"Valmis" ja loob data/vutt/metadata.csv + kopeerib pildid.
+
+Lähtekataloog: vaikimisi VUTT backup-snapshot ~/vutt-backups/latest/data
+(vt scripts/vutt_backup.py VUTT repos). Muu tee: --raw-dir.
 
 Käivitamine:
   python scripts/build_vutt_dataset.py
   python scripts/build_vutt_dataset.py --stats   # ainult statistika, ei kirjuta
+  python scripts/build_vutt_dataset.py --raw-dir /mingi/muu/tee
 """
 
 import os
@@ -16,6 +20,7 @@ import json
 import csv
 import shutil
 import re
+from datetime import datetime
 from pathlib import Path
 
 from convert_marginalia import clean_markup
@@ -27,7 +32,34 @@ from imaging import prepare_image, MAX_PIXELS
 RESIZE_IMAGES = "--resize" in sys.argv
 
 DRY_RUN   = "--stats" in sys.argv
-RAW_DIR   = Path("data/vutt-raw")
+
+# Lähteandmed. Vaikimisi VUTT backup-snapshot, varuvariandina vana
+# vutt_sync.py tõmmis data/vutt-raw/ (kui see veel eksisteerib).
+#
+# Miks snapshot: VUTT serverist käib üks tõmme (backup) kahe asemel, ja
+# andmestik on seotud kindla kuupäevastatud snapshot'iga → reprodutseeritav
+# ("treenitud snapshot'ist 20260804T143956Z", vt data/vutt/SOURCE.txt).
+#
+# NB: snapshot'i sisse EI TOHI kirjutada. Failid on hardlinkidega jagatud
+# varasemate snapshot'idega — in-place muudatus muudaks neid kõiki korraga.
+# See skript ainult loeb RAW_DIR-ist ja kirjutab OUT_DIR-i.
+DEFAULT_RAW_DIRS = [
+    Path("~/vutt-backups/latest/data").expanduser(),
+    Path("data/vutt-raw"),
+]
+RAW_DIR = next((p for p in DEFAULT_RAW_DIRS if p.exists()), DEFAULT_RAW_DIRS[0])
+for _i, _a in enumerate(sys.argv):
+    if _a == "--raw-dir" and _i + 1 < len(sys.argv):
+        RAW_DIR = Path(sys.argv[_i + 1]).expanduser()
+    elif _a.startswith("--raw-dir="):
+        RAW_DIR = Path(_a.split("=", 1)[1]).expanduser()
+
+# `latest` on symlink uusimale snapshot'ile. Lahendame selle KORRA siin, et
+# andmestik oleks seotud ühe kindla snapshot'iga ka siis, kui backup vahepeal
+# lõpetab ja symlink liigub.
+if RAW_DIR.exists():
+    RAW_DIR = RAW_DIR.resolve()
+
 OUT_DIR   = Path("data/vutt")
 IMG_DIR   = OUT_DIR / "images"
 CSV_PATH  = OUT_DIR / "metadata.csv"
@@ -117,7 +149,10 @@ def safe_image_name(work_name: str, base_name: str) -> str:
 
 def main():
     if not RAW_DIR.exists():
-        print(f"Viga: {RAW_DIR} puudub. Käivita esmalt: python scripts/vutt_sync.py")
+        print(f"Viga: {RAW_DIR} puudub.")
+        print("  Ootan VUTT backup-snapshot'i: ~/vutt-backups/latest/data")
+        print("  Kontrolli, kas öine backup jooksis: journalctl -t vutt-backup --since today")
+        print("  Muu allikas: --raw-dir /tee/kataloogile")
         sys.exit(1)
 
     pairs = []
@@ -272,6 +307,18 @@ def main():
         print(f"  Täissuuruses – protsessor skaleerib treeningu ajal.")
         print(f"  Kiirem torujuhe: --resize (vt SPIKKER.md)")
     print(f"  CSV: {CSV_PATH} ({len(pairs)} rida)")
+
+    # Päritolu: uus mudel tehakse ~korra kuus, seega neli nädalat hiljem ei mäleta
+    # keegi, millise andmeseisu pealt see treeniti. Kolm rida, mis selle vastavad.
+    source_path = OUT_DIR / "SOURCE.txt"
+    with open(source_path, "w", encoding="utf-8") as f:
+        f.write(f"raw_dir: {RAW_DIR}\n")
+        f.write(f"ehitatud: {datetime.now().isoformat(timespec='seconds')}\n")
+        f.write(f"lehti: {len(pairs)}  (--type {MATERIAL}"
+                + (", + tundmatud" if INCLUDE_UNKNOWN else "")
+                + (", --resize" if RESIZE_IMAGES else "") + ")\n")
+    print(f"  Päritolu: {source_path}")
+
     print(f"\nJärgmine samm: python scripts/train_markup.py [--test]")
 
 

@@ -66,11 +66,13 @@ Suurimad teosed:
 | 1696-9 Dissertatio philosophica de trinitate Platonis... | 22 |
 | ülejäänud 57 teost | 3–21 |
 
-**Andmevoog:** `scripts/vutt_sync.py` → rsync VUTT serverist (`meelisf@vutt:~/VUTT/data/`) → `data/vutt-raw/` (praegu 1315 teost) → `scripts/build_vutt_dataset.py` filtreerib ainult **"Valmis"** staatusega lehed, eemaldab tühjad `<m>` sildid → `data/vutt/metadata.csv`.
+**Andmevoog (alates 04.08.2026):** öine `vutt_backup.py` cron → rsync-snapshot `~/vutt-backups/latest/data` (1317 teost) → `scripts/build_vutt_dataset.py` filtreerib ainult **"Valmis"** staatusega lehed, eemaldab tühjad `<m>` sildid → `data/vutt/metadata.csv` + `data/vutt/SOURCE.txt`.
+
+**Vana andmevoog (kuni 04.08.2026):** `scripts/vutt_sync.py` → `data/vutt-raw/`. Aegunud ja kustutatud. See tõmme jooksis ilma `--delete`-ita, seega serverist kustutatud lehed jäid kohalikku koopiasse alles — 04.08 võrdlusel oli `vutt-raw`-s ~15 lehte, mida serveris enam ei ole. Snapshot on autoriteetne.
 
 **Ajaline järjestus (kontrollitud):** `data/vutt/metadata.csv` mtime = 14.06.2026 22:58; treeningu checkpoint (`models/qwen3.5-ocr-markup-20260614/adapter_model.safetensors`) mtime = 23:46 samal õhtul. Andmestik on treeninguga konsistentne — praegune 749-lk fail on täpselt see, mis treeningusse läks (erinevalt Kurrent-andmestikust, kus see nii ei olnud, vt `kurrent-andmestikud.md`).
 
-**NB:** `data/vutt-raw/` on hiljem (1.–7.07.2026) uuesti sünkroniseeritud ja kasvanud. Kui `build_vutt_dataset.py` täna uuesti käivitada, tuleks tõenäoliselt >749 lk — aga see ei mõjuta juba tehtud 14.06 treeningut, vaid on materjal järgmisele voorule.
+**NB:** 04.08.2026 ehitati andmestik uuesti, seekord backup-snapshot'ist `20260804T143956Z`: **1113 Valmis lehte** (749 → 1066 → 1113). See ei mõjuta juba tehtud 14.06 treeningut, vaid on materjal järgmisele voorule. Iga ehitus kirjutab nüüd `data/vutt/SOURCE.txt`, kust näeb kasutatud snapshot'i.
 
 **Lahknevus koodis:** `scripts/train_markup.py` docstring (read 12–13) väidab, et andmed tulevad kombineeritult `data/processed/` (136 lk, "vanem käsitsi märgendatud materjal") + `data/vutt/`, aga tegelik `DATA_SOURCES` muutuja (rida 55) sisaldab **ainult** `data/vutt/metadata.csv`. `data/processed/` (loodud märts 2026, sisaldab `*kursiiv*`-markupit) **ei ole** tegelikult 14.06 treeningus kasutatud, ehkki docstring seda väidab — docstring tuleks parandada või data/processed uuesti lisada.
 

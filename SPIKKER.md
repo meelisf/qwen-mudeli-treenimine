@@ -69,20 +69,30 @@ bash scripts/train_pipeline.sh --test
 
 ## Sammud käsitsi
 
-### 1. VUTT andmete sünkroniseerimine
+### 1. VUTT andmed — tulevad backupist, sünkima ei pea
+
+Öine cron (`vutt_backup.py`, VUTT repost) tõmbab VUTT serveri tervikuna
+snapshot'i `~/vutt-backups/latest/data`. Eraldi sünki EI OLE vaja.
+
 ```bash
-python scripts/vutt_sync.py --dry   # vaata mis muutuks
-python scripts/vutt_sync.py         # päris sünk
+ls -l ~/vutt-backups/latest                      # millise snapshot'i peale osutab
+journalctl -t vutt-backup --since today          # kas öine jooks õnnestus
 ```
-Tulemus: `data/vutt-raw/` (1260+ teost)
+
+`scripts/vutt_sync.py` on aegunud (jooksis ilma `--delete`-ita → serverist
+kustutatud lehed jäid alles). Hoia varuvariandiks, kui backup-masin on maas.
 
 ### 2. Andmestiku ehitamine
 ```bash
 python scripts/build_vutt_dataset.py --stats   # statistika
 python scripts/build_vutt_dataset.py           # kirjuta failid
 python scripts/build_vutt_dataset.py --type hand    # käsikirjad (vaikimisi print)
+python scripts/build_vutt_dataset.py --raw-dir /muu/tee   # muu allikas
 ```
-Tulemus: `data/vutt/metadata.csv` + `data/vutt/images/`
+Tulemus: `data/vutt/metadata.csv` + `data/vutt/images/` + `data/vutt/SOURCE.txt`
+
+`SOURCE.txt` ütleb, MILLISEST snapshot'ist see andmestik tehti — kuu aega hiljem
+on see ainus viis teada, mille peal mudel treeniti.
 
 Trüki- ja käsikirjamudelit treenitakse eraldi, seega `--type` filtreerib
 teose `_metadata.json` järgi (Wikidata `Q1261026` = trükis, `Q87167` =
@@ -204,7 +214,7 @@ sudo systemctl start ocr-service
 | `data/lehekyljed/` | 1500 lk, Kreeka + ladina, puhas tekst | etapp 1 treening |
 | `data/processed/` | 136 lk, käsitsi märgendatud, markup | markup treening |
 | `data/vutt/` | VUTT Valmis lehed, markup | markup treening |
-| `data/vutt-raw/` | VUTT toortõmmis (rsync) | vahekataloog |
+| `~/vutt-backups/latest/data` | VUTT backup-snapshot (öine cron) | lähteandmed |
 
 ## Mudelid
 

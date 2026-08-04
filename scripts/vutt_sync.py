@@ -1,9 +1,20 @@
 #!/usr/bin/env python3
 """
-VUTT andmete sünkroniseerimine
+VUTT andmete sünkroniseerimine — AEGUNUD (2026-08-04)
 
-Tõmbab rsync-iga VUTT serveri ~/VUTT/data/ sisu siia masinasse
-kataloogi data/vutt-raw/.
+Kasuta selle asemel VUTT backup-snapshot'i: `~/vutt-backups/latest/data`,
+mille tekitab VUTT repo `scripts/vutt_backup.py` (öine cron). See on ka
+`build_vutt_dataset.py` vaikimisi allikas.
+
+Miks aegunud:
+  - kaks eraldi tõmmet samast serverist (backup + see) on raisatud töö;
+  - see skript jookseb ILMA `--delete`-ita, seega serverist kustutatud teosed
+    ja lehed jäid `data/vutt-raw/`-i alles ja rändasid vaikselt treeningdatasse;
+  - snapshot on kuupäevastatud → andmestik on reprodutseeritav
+    (vt `data/vutt/SOURCE.txt`).
+
+Hoia alles varuvariandina, kui backup-masin ei ole kättesaadav.
+Tõmbab rsync-iga VUTT serveri ~/VUTT/data/ sisu kataloogi data/vutt-raw/.
 
 Käivitamine:
   python scripts/vutt_sync.py          # täisrsync
