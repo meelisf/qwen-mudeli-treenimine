@@ -1,3 +1,14 @@
+# Tühja lehekülje märgend – üks ja ainus kokkulepitud vorm.
+#
+# Miks: ilma selleta ei ole mudelil tühjal lehel midagi, mille peal lõpetada –
+# ta läheb loopi ja genereerib token-laeni suvalist teksti, mistõttu tühi leht
+# võtab rohkem aega kui tekstiga leht. Vt SPIKKER.md, "Tühjad leheküljed".
+#
+# Seda stringi kasutavad nii mõlemad juhised siin failis kui ka
+# build_vutt_dataset.py kontroll (--only-empty). Muutmisel tuleb muuta ka
+# VUTT-i poolel – vabatekstivariandid ei õpeta mudelile midagi.
+EMPTY_PAGE_MARKER = "[tühi lehekülg]"
+
 INSTRUCTION = """You are an expert OCR assistant for historical documents. Transcribe the page using VUTT XML markup.
 
 Instructions:
@@ -40,6 +51,13 @@ Instructions:
    the surrounding text.
 13. Signature marks (quire numbers): place at the very end, e.g. A 3
 
+Blank pages: if the page has no text on it at all (blank leaf, blank verso, endpaper),
+return exactly this single line and nothing else:
+[tühi lehekülg]
+Do not describe the page, do not invent text, do not repeat text from other pages.
+A page that carries only a page number, a signature mark, a stamp or an ink stain is
+NOT blank – transcribe it normally.
+
 Return only the exact transcription as plain text with VUTT XML markup."""
 
 KURRENT_INSTRUCTION = """You are an expert transcriber of historical handwritten documents. Transcribe the handwritten text on this page.
@@ -55,5 +73,12 @@ Instructions:
 5. Preserve original capitalization and punctuation.
 6. If the page contains two columns or two halves, transcribe left side first, then right side.
 7. Do not add any XML tags, markdown, or formatting — plain text only.
+
+Blank pages: if the page has no writing on it at all (blank leaf, blank verso, endpaper),
+return exactly this single line and nothing else:
+[tühi lehekülg]
+Do not describe the page, do not invent text, do not repeat text from other pages.
+A page that carries only a page number, an archival stamp or an ink stain is NOT blank –
+transcribe what is there.
 
 Return only the transcription."""

@@ -12,6 +12,11 @@ Käivitamine:
   python scripts/build_vutt_dataset.py
   python scripts/build_vutt_dataset.py --stats   # ainult statistika, ei kirjuta
   python scripts/build_vutt_dataset.py --raw-dir /mingi/muu/tee
+
+Tühjad leheküljed Kurrent-andmestikku (vt SPIKKER.md "Tühjad leheküljed"):
+  python scripts/build_vutt_dataset.py --type hand --only-empty --stats
+  python scripts/build_vutt_dataset.py --type hand --only-empty \\
+      --out data/kurrent --append --allikas vutt_tyhjad
 """
 
 import os
@@ -25,6 +30,11 @@ from pathlib import Path
 
 from convert_marginalia import clean_markup
 from imaging import prepare_image, MAX_PIXELS
+from prompt import EMPTY_PAGE_MARKER
+
+# Terve lehekülje transkriptsioon võib ületada csv-mooduli vaikimisi
+# väljapiirangut (128 kB), kui loeme olemasolevat andmestikku --append jaoks.
+csv.field_size_limit(10 ** 7)
 
 # Piltide eelskaleerimine on OPT-IN, sest see on inferentsiga seotud:
 # eelskaleeritud andmestikul treenitud mudel eeldab, et ka inferents
@@ -60,9 +70,36 @@ for _i, _a in enumerate(sys.argv):
 if RAW_DIR.exists():
     RAW_DIR = RAW_DIR.resolve()
 
-OUT_DIR   = Path("data/vutt")
+DEFAULT_OUT_DIR = Path("data/vutt")
+OUT_DIR = DEFAULT_OUT_DIR
+OUT_EXPLICIT = False
+for _i, _a in enumerate(sys.argv):
+    if _a == "--out" and _i + 1 < len(sys.argv):
+        OUT_DIR, OUT_EXPLICIT = Path(sys.argv[_i + 1]).expanduser(), True
+    elif _a.startswith("--out="):
+        OUT_DIR, OUT_EXPLICIT = Path(_a.split("=", 1)[1]).expanduser(), True
 IMG_DIR   = OUT_DIR / "images"
 CSV_PATH  = OUT_DIR / "metadata.csv"
+
+# --append lisab olemasolevale CSV-le read juurde (olemasolevat sisu ei
+# kirjutata üle). Nii saab VUTT-i lehed panna Kurrent-andmestikku, mis on
+# 17 000 rida välisallikaid – ülekirjutamine hävitaks selle.
+APPEND = "--append" in sys.argv
+FORCE  = "--force" in sys.argv
+
+# Kolmanda veeru (`allikas`) väärtus, kui sihtCSV seda kasutab.
+ALLIKAS = "vutt"
+ALLIKAS_EXPLICIT = False
+for _i, _a in enumerate(sys.argv):
+    if _a == "--allikas" and _i + 1 < len(sys.argv):
+        ALLIKAS, ALLIKAS_EXPLICIT = sys.argv[_i + 1], True
+    elif _a.startswith("--allikas="):
+        ALLIKAS, ALLIKAS_EXPLICIT = _a.split("=", 1)[1], True
+
+# --only-empty: võta ainult tühjaks märgitud leheküljed. Ilma selleta tõmbaks
+# `--out data/kurrent` kaasa kogu VUTT-i käsikirjamaterjali koos XML
+# märgendusega, mida Kurrent-mudel ei oska ega taha.
+ONLY_EMPTY = "--only-empty" in sys.argv
 
 VALMIS_STATUSES = {"Valmis"}
 
@@ -83,6 +120,61 @@ for _i, _a in enumerate(sys.argv):
 if MATERIAL not in ("print", "hand", "all"):
     print(f"Viga: --type peab olema print, hand või all (oli: {MATERIAL})")
     sys.exit(1)
+
+# data/vutt on TRÜKI markup-andmestik (train_markup.py loeb sealt). Käsikirja-
+# jooks ilma --out liputa kirjutaks selle üle ja järgmine markup-treening
+# treeniks vaikselt vale materjali peal.
+if MATERIAL != "print" and not OUT_EXPLICIT and not DRY_RUN:
+    print(f"Viga: --type {MATERIAL} kirjutaks üle {DEFAULT_OUT_DIR}/, "
+          f"mis on TRÜKI markup-andmestik.")
+    print("  Anna sihtkoht: --out data/kurrent --append --allikas vutt_tyhjad")
+    print(f"  Kui tahad päriselt {DEFAULT_OUT_DIR}/ üle kirjutada: "
+          f"--out {DEFAULT_OUT_DIR}")
+    sys.exit(1)
+
+
+# --- Tühja lehekülje märgend ---------------------------------------------
+# VUTT-is käsitsi märgendades on lihtne kirjutada "tühi leht", "[Tühi
+# lehekülg]" või jätta sulud ära. Treeningu jaoks on oluline, et string oleks
+# BAIT-BAIT sama – muidu ei õpi mudel seda lõpetamismärgina, mis oli terve
+# harjutuse mõte. Seepärast tunneme variandid ära ja kaebame nende üle,
+# selle asemel et vaikselt sisse lasta või vaikselt parandada.
+EMPTY_VARIANTS = {
+    "tühi lehekülg", "tühi lehekülg.", "tühi leht", "tühi lk", "tühi",
+    "lehekülg tühi", "leht tühi", "tyhi lehekylg", "tyhi lehekulg",
+    "empty page", "blank page", "empty", "blank", "leer", "leere seite",
+    "vacat", "vacuum",
+}
+
+
+def _fold(s: str) -> str:
+    """Täpitähed maha – 'tühi lehekülg' ja 'tyhi lehekulg' on sama kirjaviga."""
+    return s.translate(str.maketrans("üõöäåÜÕÖÄÅ", "uooaaUOOAA"))
+
+
+EMPTY_VARIANTS_FOLDED = {_fold(v) for v in EMPTY_VARIANTS}
+
+
+def empty_marker_kind(text: str) -> str | None:
+    """Kas lehekülg on märgitud tühjaks?
+
+    Tagastab:
+      'exact'   – EMPTY_PAGE_MARKER (ümbritsev tühik lubatud), kõlblik
+      'variant' – mõeldud tühjaks, aga vales vormis (paranda VUTT-is)
+      'mixed'   – märgend koos muu tekstiga (kas leht pole tühi või jäi
+                  märgend kogemata sisse)
+      None      – tavaline leht
+    """
+    if text.strip() == EMPTY_PAGE_MARKER:
+        return "exact"
+
+    norm = re.sub(r"<[^>]+>", "", text)             # märgendid maha
+    norm = re.sub(r"\s+", " ", norm).strip().lower()
+    if _fold(norm.strip("[](){}. ")) in EMPTY_VARIANTS_FOLDED:
+        return "variant"
+    if EMPTY_PAGE_MARKER.lower() in norm:
+        return "mixed"
+    return None
 
 
 def read_work_type(work_dir: Path) -> str:
@@ -161,6 +253,10 @@ def main():
     skipped_no_txt = 0
     skipped_empty = 0
     cleaned_markup = 0
+    empty_pages = []        # korrektselt märgitud tühjad lehed
+    empty_txt_pages = []    # Valmis, aga tekst puudub – kandidaat tühjaks
+    bad_empty = []          # tühjaks mõeldud, aga vales vormis
+    mixed_empty = []        # märgend koos muu tekstiga
 
     works = sorted(
         d for d in RAW_DIR.iterdir()
@@ -215,6 +311,9 @@ def main():
             transcription = read_transcription(txt_path)
             if not transcription:
                 skipped_empty += 1
+                if keep:
+                    # Tõenäoline tühi lehekülg, mis ootab VUTT-is märgendamist
+                    empty_txt_pages.append(f"{work_dir.name}/{base}")
                 continue
 
             # Tüübifilter alles siin, et loendur kajastaks päriselt kõlblikke
@@ -231,6 +330,23 @@ def main():
             if not transcription:
                 skipped_empty += 1
                 continue
+
+            # Tühja lehekülje märgendi kontroll
+            kind = empty_marker_kind(transcription)
+            page_id = f"{work_dir.name}/{base}"
+            if kind == "exact":
+                # Bait-bait sama string igal tühjal lehel – ainult nii õpib
+                # mudel seda lõpetamismärgina.
+                transcription = EMPTY_PAGE_MARKER
+                empty_pages.append(page_id)
+            elif kind == "variant":
+                bad_empty.append((page_id, transcription.replace("\n", " ")[:60]))
+                continue                      # vale vorm ei lähe andmestikku
+            elif kind == "mixed":
+                mixed_empty.append((page_id, transcription.replace("\n", " ")[:60]))
+                continue
+            elif ONLY_EMPTY:
+                continue                      # tavaline leht, --only-empty jätab välja
 
             # Unikaalne pildinimi
             img_name = safe_image_name(work_dir.name, jpg_path.name)
@@ -252,6 +368,48 @@ def main():
     if excluded:
         print(f"  Vahele jäetud (vale tüüp): "
               + ", ".join(f"{k}={v}" for k, v in excluded.items()))
+    # --- Tühjade lehekülgede aruanne -------------------------------------
+    if ONLY_EMPTY:
+        print(f"  --only-empty: ainult tühjaks märgitud lehed")
+    print(f"  Tühjaks märgitud (õiges vormis '{EMPTY_PAGE_MARKER}'): "
+          f"{len(empty_pages)}")
+    for pid in empty_pages[:10]:
+        print(f"        {pid}")
+    if len(empty_pages) > 10:
+        print(f"        ... ja veel {len(empty_pages) - 10}")
+
+    if bad_empty:
+        print(f"\n  !! {len(bad_empty)} lehte on tühjaks märgitud VALES VORMIS "
+              f"– jäid välja.")
+        print(f"     Paranda VUTT-is täpselt vormi: {EMPTY_PAGE_MARKER}")
+        for pid, txt in bad_empty[:10]:
+            print(f"        {pid}: {txt!r}")
+        if len(bad_empty) > 10:
+            print(f"        ... ja veel {len(bad_empty) - 10}")
+
+    if mixed_empty:
+        print(f"\n  !! {len(mixed_empty)} lehel on tühja lehe märgend KOOS muu "
+              f"tekstiga – jäid välja.")
+        print(f"     Kas leht pole tühi (eemalda märgend) või on märgend "
+              f"kogemata sisse jäänud.")
+        for pid, txt in mixed_empty[:10]:
+            print(f"        {pid}: {txt!r}")
+        if len(mixed_empty) > 10:
+            print(f"        ... ja veel {len(mixed_empty) - 10}")
+
+    # Loend on tüübifiltriga (ainult need, mis muidu andmestikku läheksid),
+    # erinevalt üldloendurist skipped_empty.
+    if empty_txt_pages:
+        print(f"\n  NB! {len(empty_txt_pages)} Valmis lehel on transkriptsioon "
+              f"tühi. Kui need on tühjad")
+        print(f"      leheküljed, kirjuta VUTT-is sisuks {EMPTY_PAGE_MARKER} "
+              f"– tühi string ei õpeta")
+        print(f"      mudelile midagi ja leht jääb andmestikust välja.")
+        for pid in empty_txt_pages[:10]:
+            print(f"        {pid}")
+        if len(empty_txt_pages) > 10:
+            print(f"        ... ja veel {len(empty_txt_pages) - 10}")
+
     if unknown_works and not INCLUDE_UNKNOWN:
         print(f"\n  NB! {len(unknown_works)} teosel puudub VUTT-is type-väli, "
               f"seega jäid välja ({type_pages['unknown']} Valmis lehte).")
@@ -269,16 +427,55 @@ def main():
         print("\nHoiatus: ühtki sobivat lehekülge ei leitud.")
         return
 
+    # --- Sihtfaili päis ja olemasolev sisu -------------------------------
+    # Sihtandmestik võib olla kolmeveeruline (data/kurrent: failinimi,
+    # transkriptsioon, allikas) või kaheveeruline (data/vutt). Loeme päise
+    # olemasolevast failist, et mitte veergu kaotada.
+    header = ["failinimi", "transkriptsioon"]
+    if ALLIKAS_EXPLICIT:
+        header.append("allikas")     # uus fail, aga allikaveerg on soovitud
+    existing_files = set()
+    if CSV_PATH.exists():
+        with open(CSV_PATH, encoding="utf-8", newline="") as f:
+            reader = csv.reader(f)
+            try:
+                header = next(reader)
+            except StopIteration:
+                header = ["failinimi", "transkriptsioon"]
+            existing_files = {row[0] for row in reader if row}
+
+        if "failinimi" not in header or "transkriptsioon" not in header:
+            print(f"\nViga: {CSV_PATH} päis on ootamatu: {header}")
+            sys.exit(1)
+
+        if not APPEND and header != ["failinimi", "transkriptsioon"] and not FORCE:
+            print(f"\nViga: {CSV_PATH} on olemas ja kolmeveeruline ({header}) – "
+                  f"ülekirjutamine hävitaks {len(existing_files)} rida.")
+            print("  Lisamiseks: --append   Ülekirjutamiseks: --force")
+            sys.exit(1)
+
+    if APPEND and "allikas" in header:
+        print(f"\nLisan olemasolevale andmestikule: allikas={ALLIKAS}")
+
     # Loo väljundkataloog
     IMG_DIR.mkdir(parents=True, exist_ok=True)
 
     # Kopeeri/skaleeri pildid ja kirjuta CSV
     counts = {"resized": 0, "copied": 0, "kept": 0}
-    with open(CSV_PATH, "w", encoding="utf-8", newline="") as f:
+    written = 0
+    duplicates = 0
+    mode = "a" if (APPEND and CSV_PATH.exists()) else "w"
+    with open(CSV_PATH, mode, encoding="utf-8", newline="") as f:
         writer = csv.writer(f)
-        writer.writerow(["failinimi", "transkriptsioon"])
+        if mode == "w":
+            writer.writerow(header)
 
         for p in pairs:
+            rel = f"images/{p['img_name']}"
+            if APPEND and rel in existing_files:
+                duplicates += 1
+                continue
+
             dst = IMG_DIR / p["img_name"]
             if RESIZE_IMAGES:
                 counts[prepare_image(p["img_src"], dst)] += 1
@@ -288,7 +485,16 @@ def main():
             else:
                 counts["kept"] += 1
 
-            writer.writerow([f"images/{p['img_name']}", p["transkriptsioon"]])
+            values = {
+                "failinimi": rel,
+                "transkriptsioon": p["transkriptsioon"],
+                "allikas": ALLIKAS,
+            }
+            writer.writerow([values.get(col, "") for col in header])
+            written += 1
+
+    if duplicates:
+        print(f"  Juba andmestikus, vahele jäetud: {duplicates}")
 
     print(f"\nValmis!")
     if RESIZE_IMAGES:
@@ -306,20 +512,31 @@ def main():
               f"(olemas juba: {counts['kept']})")
         print(f"  Täissuuruses – protsessor skaleerib treeningu ajal.")
         print(f"  Kiirem torujuhe: --resize (vt SPIKKER.md)")
-    print(f"  CSV: {CSV_PATH} ({len(pairs)} rida)")
+    print(f"  CSV: {CSV_PATH} ({written} rida "
+          + ("juurde lisatud)" if APPEND else "kirjutatud)"))
 
     # Päritolu: uus mudel tehakse ~korra kuus, seega neli nädalat hiljem ei mäleta
     # keegi, millise andmeseisu pealt see treeniti. Kolm rida, mis selle vastavad.
+    # --append puhul lisame kirje, mitte ei kirjuta üle: sihtandmestik on
+    # ehitatud mitmest jooksust ja iga jooks peab jälje jätma.
     source_path = OUT_DIR / "SOURCE.txt"
-    with open(source_path, "w", encoding="utf-8") as f:
+    with open(source_path, "a" if APPEND else "w", encoding="utf-8") as f:
+        if APPEND:
+            f.write("\n")
         f.write(f"raw_dir: {RAW_DIR}\n")
         f.write(f"ehitatud: {datetime.now().isoformat(timespec='seconds')}\n")
-        f.write(f"lehti: {len(pairs)}  (--type {MATERIAL}"
+        f.write(f"lehti: {written}  (--type {MATERIAL}"
                 + (", + tundmatud" if INCLUDE_UNKNOWN else "")
+                + (", --only-empty" if ONLY_EMPTY else "")
+                + (f", --append allikas={ALLIKAS}" if APPEND else "")
                 + (", --resize" if RESIZE_IMAGES else "") + ")\n")
     print(f"  Päritolu: {source_path}")
 
-    print(f"\nJärgmine samm: python scripts/train_markup.py [--test]")
+    if OUT_EXPLICIT:
+        print(f"\nJärgmine samm: kontrolli {CSV_PATH} ja treeni sihtandmestiku "
+              f"skriptiga.")
+    else:
+        print(f"\nJärgmine samm: python scripts/train_markup.py [--test]")
 
 
 if __name__ == "__main__":

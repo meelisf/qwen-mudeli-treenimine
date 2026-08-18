@@ -124,6 +124,139 @@ Lehed, mida parandus ainult vormistab ja mis vajavad VUTT-is käsitsi
 parandust (liigne `<m>` keset sõna, dubleeritud `<i>`), on loetletud failis
 `docs/katkised-lehed-20260721.txt`.
 
+### ⚠️ Tühjad leheküljed puuduvad treeningandmetest (lahendamata)
+
+**Probleem:** kui mudelile anda tühi (või peaaegu tühi) lehekülg, läheb ta
+loopi ja genereerib maksimumini täiesti suvalist teksti. Tagajärg on
+kahtlaselt vastupidine intuitsioonile: **tühi lehekülg võtab praegu
+tunduvalt rohkem aega kui tekstiga lehekülg** — tekstiga leht lõpetab
+loomulikult EOS-iga, tühi leht jookseb iga kord token-lakke (~8 min lehe
+kohta). Kui partiis on tühje lehti, on aeglus just nende taga, mitte
+raske teksti taga.
+
+Põhjus on lihtne: **mudel ei ole kunagi näinud ühtegi näidet, kus õige
+vastus on „lehekülg on tühi"**, seega pole tal midagi, mille peal lõpetada.
+
+**Kontrollitud 18.08.2026 – ükski andmestik ei sisalda tühja lehekülge:**
+
+| Andmestik | Ridu | Tühja transkriptsiooniga |
+|---|---|---|
+| `data/vutt/metadata.csv` (markup, trükk) | 1113 | 0 |
+| `data/kurrent/metadata.csv` | 17 018 | 0 |
+| `data/kurrent/metadata_balanced.csv` | 11 018 | 0 |
+| `data/processed/metadata.csv` | 136 | 0 |
+| `data/lehekyljed/metadata.csv` (etapp 1) | 1500 | 15 – **aga need filtreeritakse treeningust välja** |
+
+Ka „peaaegu tühje" lehti (alla 20 tähemärgi) ei ole üheski andmestikus.
+Nullid ei ole juhus, vaid tulevad kahest filtrist:
+`build_vutt_dataset.py` viskab tühja transkriptsiooniga lehed välja
+(loendur `Vahele jäetud (tühi tekst)`) ja `train.py:125` teeb sama laadimisel.
+Seega **mitte ükski senine treening – ei etapp 1, ei markup, ei Kurrent –
+ei ole näinud ühtegi tühja lehekülge.**
+
+Üks kasulik leid: need 15 rida failis `data/lehekyljed/metadata.csv` on
+päris tühjade lehtede ja köidete pildid (Gezeliuse eeslehed 0002–0006 ja
+0445–0448, köitepildid `eb01`–`eb04`, `00140`, kaks disputatsiooni
+vahelehte) – **pildid on kettal alles**, ainult transkriptsioon on tühi
+string. Trükipoole tühjade lehtede stardikomplekt on seega juba olemas:
+piisab, kui asendada tühi string stringiga `[tühi lehekülg]`. NB! `eb01`–
+`eb04` on köitekaaned (mõõteskaala ja raamatukogu silt pildil), mitte
+tühjad leheküljed – need on eri juhtum ja väärivad eraldi otsust.
+
+**Kokku lepitud transkriptsioon** (otsustatud 18.08.2026) – tühja lehe ainus
+sisu on täpselt üks rida:
+
+```
+[tühi lehekülg]
+```
+
+Sama string peab käima läbi kolme koha: VUTT-i märgendus, `scripts/prompt.py`
+juhis ja andmestiku ehitajad. Vabateksti variante („tühi", „leht on tühi")
+ei tohi tekkida – muidu ei õpi mudel seda kui lõpetamismärki.
+
+Ülejäänud nõuded:
+
+- **Kogus ~1–3 % lehtedest** – piisav, et muster kinnistuks, aga mitte nii
+  palju, et mudel hakkaks tühjust ka kirjutatud lehtedele pakkuma.
+- **Vahepealsed juhud** (leheküljel ainult signatuur, ainult leheküljenumber,
+  ainult tint-plekk) transkribeeritakse tavaliselt – tühja lehe märgend
+  ainult tõesti tühjale.
+- Ehitaja tühja-teksti filter jääb alles: `[tühi lehekülg]` **ei ole** tühi
+  string, seega ta läbib filtri probleemideta. Päriselt 0-baidised lehed
+  jäävad edasi välja (need on märgendamata, mitte tühjad).
+- Seni kuni see puudu on, tasub inferentsi poolel hoida käes ka
+  n-o hädapidur: token-lakke jooksnud väljundi äratundmine ja äraviskamine.
+
+**Trükilehed – lahendus olemas.** Tühjad trükileheküljed märgendatakse
+VUTT-is käsitsi ja tulevad tavalist teed pidi: backup-snapshot →
+`build_vutt_dataset.py` → `data/vutt/metadata.csv` → `train_markup.py`.
+Eraldi lippe ei ole vaja – tavaline jooks korjab tühjad lehed koos muuga
+ja kontrollib märgendi vormi. Seisuga 18.08.2026 on VUTT-is juba **12 Valmis
+lehte tühja transkriptsiooniga** (6 trükis + 6 käsikirjas) – need on esimesed
+kandidaadid, mida `[tühi lehekülg]`-ks märkida. `--stats` loetleb nad
+teose/lehe kaupa ette.
+
+**Käsikirjad – suurem probleem, aga tee on valitud.** Kurrent-mudel
+treenitakse failist `data/kurrent/metadata.csv` (17 018 rida, 12 välisallikat
++ 2039 määramata; kontrollitud 18.08.2026: **0 tühja lehekülge**). Need on
+arhiivikorpused (Riksarkivet, Bullinger, Hanse, Dresden, senatsprotokollid) –
+neid ei saa VUTT-is märgendada ja tühje lehti nad ei sisalda, sest
+transkribeeritud on ainult kirjutatud leheküljed. Praktikas on käsikirjade
+tühjad lehed sagedasemad kui trükistel (tühjad versopooled, eeslehed),
+seega häirib probleem siin rohkem.
+
+**Otsustatud (18.08.2026):** tühjad käsikirjaleheküljed märgendatakse samuti
+VUTT-is (`type=Q87167` teosed, transkriptsioon `[tühi lehekülg]`, staatus
+Valmis) ja **lisatakse olemasolevale 17 000 lk andmestikule** uue allikana –
+mitte eraldi paralleelse andmestikuna. `data/kurrent/metadata.csv` on
+3-veeruline (`failinimi, transkriptsioon, allikas`), seega rida on lihtne
+juurde panna: allikanimi nt `vutt_tyhjad`, ja `scripts/filter_dataset.py
+--max-per-source` hoiab osakaalu paigas.
+
+**Siinpoolne osa on valmis (18.08.2026)** – jäänud on ainult VUTT-is
+märgendamine:
+
+- `scripts/prompt.py`: konstant `EMPTY_PAGE_MARKER = "[tühi lehekülg]"` on
+  ainus tõeallikas ja tühja lehe reegel on lisatud mõlemasse juhisesse –
+  `INSTRUCTION` (trükk/markup) ja `KURRENT_INSTRUCTION` (käsikiri).
+- `build_vutt_dataset.py`: uued lipud `--out`, `--append`, `--allikas`,
+  `--only-empty`, `--force` + tühja lehe märgendi kontroll.
+
+**Käsikirjade tühjade lehtede lisamine 17 000 lk andmestikule:**
+
+```bash
+# 1. Vaata üle, mis VUTT-ist tuleb (ei kirjuta midagi)
+python scripts/build_vutt_dataset.py --type hand --only-empty --stats
+
+# 2. Lisa Kurrent-andmestikule
+python scripts/build_vutt_dataset.py --type hand --only-empty \
+    --out data/kurrent --append --allikas vutt_tyhjad
+```
+
+Mida kontroll teeb:
+
+| Olukord | Tulemus |
+|---|---|
+| täpselt `[tühi lehekülg]` (ümbritsev tühik lubatud) | läheb andmestikku, salvestatakse kanoonilises vormis |
+| `tühi leht`, `[Tühi lehekülg]`, `blank page`, `vacat`, täpitähtedeta variant | **jääb välja**, loetletakse „VALES VORMIS" all – paranda VUTT-is |
+| `[tühi lehekülg]` koos muu tekstiga | **jääb välja**, loetletakse eraldi (kas leht pole tühi või jäi märgend sisse) |
+| Valmis leht tühja `.txt`-ga | jääb nagu enne välja, aga skript ütleb, et äkki peaks olema märgitud tühjaks |
+
+Ohutuslukud, mis samal ajal tekkisid:
+
+- `--type hand|all` **ilma `--out` liputa annab vea** – muidu kirjutaks
+  käsikirjajooks üle `data/vutt/` trükiandmestiku.
+- `--append` ei kirjuta olemasolevat CSV-d ümber, vaid lisab read lõppu;
+  juba olemas olevad failinimed jäetakse vahele (kordusjooks on ohutu).
+  Kolmas veerg `allikas` täidetakse `--allikas` väärtusega.
+- Ilma `--append` liputa kolmeveerulise CSV peale kirjutamine on **keelatud**
+  (nõuab `--force`) – muidu hävitaks üks käsklus 17 000 rida.
+- `SOURCE.txt` saab `--append` puhul uue kirje juurde, vana jääb alles.
+
+**Kogus:** 17 018 rea juures tähendab 1–3 % umbes 170–500 tühja lehte. Nii
+palju käsitsi märgendada pole mõtet – alusta väiksemast (30–50) ja vaata,
+kas mudel hakkab tühja lehe peal lõpetama; vajadusel korda.
+
 ### Piltide eelskaleerimine (`--resize`) – lugege enne kasutamist
 
 Meie skaneeringud on mediaanis ~15 MP, eelarve on 5,12 MP. Vaikimisi läheb
