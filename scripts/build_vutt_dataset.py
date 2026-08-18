@@ -101,6 +101,24 @@ for _i, _a in enumerate(sys.argv):
 # märgendusega, mida Kurrent-mudel ei oska ega taha.
 ONLY_EMPTY = "--only-empty" in sys.argv
 
+# --max-chars N: võta ainult hõredad lehed – need, mille tekstis on kuni N
+# tähemärki (märgendid maha arvatud). Tühjaks märgitud lehed mahuvad siia
+# alati sisse, sest märgend ise on 15 märki.
+#
+# Miks: mudel on treenitud ainult täistekstiga lehtedel (data/vutt mediaan
+# 2254 märki, ALLA 100 märgi mitte ühtegi lehte), seega eeldab ta, et igal
+# lehel peab teksti palju olema. Kui lehel on ainult leheküljenumber või
+# paar rida, satub ta segadusse ja hakkab juurde luuletama.
+MAX_CHARS = None
+for _i, _a in enumerate(sys.argv):
+    if _a == "--max-chars" and _i + 1 < len(sys.argv):
+        MAX_CHARS = int(sys.argv[_i + 1])
+    elif _a.startswith("--max-chars="):
+        MAX_CHARS = int(_a.split("=", 1)[1])
+
+# Millest allpool loeme lehte "hõredaks" aruandes (ei filtreeri midagi).
+SPARSE_LIMIT = MAX_CHARS if MAX_CHARS is not None else 100
+
 VALMIS_STATUSES = {"Valmis"}
 
 # --- Materjali tüüp -------------------------------------------------------
@@ -145,6 +163,16 @@ EMPTY_VARIANTS = {
     "empty page", "blank page", "empty", "blank", "leer", "leere seite",
     "vacat", "vacuum",
 }
+
+
+def plain_length(text: str) -> int:
+    """Teksti pikkus ilma XML-märgenditeta ja korduvate tühikuteta.
+
+    `<i>A</i>` on kaks korda pikem kui `A`, aga mudeli jaoks on see üks
+    täht – hõreduse mõõtmisel loeb sisu, mitte märgendus.
+    """
+    plain = re.sub(r"<[^>]+>", "", text)
+    return len(re.sub(r"\s+", " ", plain).strip())
 
 
 def _fold(s: str) -> str:
@@ -255,6 +283,7 @@ def main():
     cleaned_markup = 0
     empty_pages = []        # korrektselt märgitud tühjad lehed
     empty_txt_pages = []    # Valmis, aga tekst puudub – kandidaat tühjaks
+    sparse_pages = []       # vähese tekstiga lehed (nt ainult lk number)
     bad_empty = []          # tühjaks mõeldud, aga vales vormis
     mixed_empty = []        # märgend koos muu tekstiga
 
@@ -348,6 +377,14 @@ def main():
             elif ONLY_EMPTY:
                 continue                      # tavaline leht, --only-empty jätab välja
 
+            # Hõredad lehed: loenda alati, filtreeri ainult --max-chars puhul
+            n_chars = plain_length(transcription)
+            if n_chars <= SPARSE_LIMIT:
+                sparse_pages.append((page_id, n_chars,
+                                     transcription.replace("\n", " ")[:60]))
+            elif MAX_CHARS is not None:
+                continue
+
             # Unikaalne pildinimi
             img_name = safe_image_name(work_dir.name, jpg_path.name)
             pairs.append({
@@ -377,6 +414,20 @@ def main():
         print(f"        {pid}")
     if len(empty_pages) > 10:
         print(f"        ... ja veel {len(empty_pages) - 10}")
+
+    # Hõredad lehed – vt --max-chars kommentaari failis ülal.
+    if MAX_CHARS is not None:
+        print(f"  --max-chars {MAX_CHARS}: ainult hõredad lehed")
+    label = "valitud" if MAX_CHARS is not None else "andmestikus"
+    print(f"  Hõredaid lehti ≤{SPARSE_LIMIT} märki ({label}): "
+          f"{len(sparse_pages)}")
+    for pid, n, txt in sorted(sparse_pages, key=lambda x: x[1])[:10]:
+        print(f"        {n:4d} märki  {pid}: {txt!r}")
+    if len(sparse_pages) > 10:
+        print(f"        ... ja veel {len(sparse_pages) - 10}")
+    if not sparse_pages and MAX_CHARS is None:
+        print(f"        (mudel ei näe ühtegi näidet hõredast lehest – "
+              f"vt SPIKKER.md)")
 
     if bad_empty:
         print(f"\n  !! {len(bad_empty)} lehte on tühjaks märgitud VALES VORMIS "

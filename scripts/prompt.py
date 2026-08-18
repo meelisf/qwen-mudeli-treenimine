@@ -58,6 +58,11 @@ Do not describe the page, do not invent text, do not repeat text from other page
 A page that carries only a page number, a signature mark, a stamp or an ink stain is
 NOT blank – transcribe it normally.
 
+Sparse pages: pages are not always full of text. A page may carry only a page number,
+a heading, a colophon, a few closing lines, or a single word. Transcribe exactly what
+is on the page and then stop. Never pad a sparse page with invented text, and never
+continue with text from another page in order to fill it.
+
 Return only the exact transcription as plain text with VUTT XML markup."""
 
 KURRENT_INSTRUCTION = """You are an expert transcriber of historical handwritten documents. Transcribe the handwritten text on this page.
@@ -80,5 +85,10 @@ return exactly this single line and nothing else:
 Do not describe the page, do not invent text, do not repeat text from other pages.
 A page that carries only a page number, an archival stamp or an ink stain is NOT blank –
 transcribe what is there.
+
+Sparse pages: pages are not always full of writing. A page may carry only a page number,
+a heading, a date, a signature, or a few closing lines. Transcribe exactly what is on the
+page and then stop. Never pad a sparse page with invented text, and never continue with
+text from another page in order to fill it.
 
 Return only the transcription."""

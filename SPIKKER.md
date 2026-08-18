@@ -124,7 +124,7 @@ Lehed, mida parandus ainult vormistab ja mis vajavad VUTT-is käsitsi
 parandust (liigne `<m>` keset sõna, dubleeritud `<i>`), on loetletud failis
 `docs/katkised-lehed-20260721.txt`.
 
-### ⚠️ Tühjad leheküljed puuduvad treeningandmetest (lahendamata)
+### ⚠️ Tühjad ja hõredad leheküljed treeningandmetes (lahendamata)
 
 **Probleem:** kui mudelile anda tühi (või peaaegu tühi) lehekülg, läheb ta
 loopi ja genereerib maksimumini täiesti suvalist teksti. Tagajärg on
@@ -136,6 +136,26 @@ raske teksti taga.
 
 Põhjus on lihtne: **mudel ei ole kunagi näinud ühtegi näidet, kus õige
 vastus on „lehekülg on tühi"**, seega pole tal midagi, mille peal lõpetada.
+
+**Sama probleemi teine pool: hõredad lehed.** Mudel ei ole näinud ka lehti,
+kus on lihtsalt *vähe* teksti – ainult leheküljenumber, pealkiri, kolofon,
+paar lõpurida. Ta on õppinud, et lehel peab teksti palju olema, ja hakkab
+hõredal lehel puuduolevat juurde luuletama. Tühi lehekülg on selle skaala
+äärmus, mitte eraldi nähtus – seepärast lahendatakse mõlemad koos.
+
+Tekstipikkuse jaotus (mõõdetud 18.08.2026, märgendid maha arvatud):
+
+| Andmestik | Mediaan | ≤50 märki | ≤100 | ≤200 |
+|---|---|---|---|---|
+| `data/vutt` (markup, trükk) | 2254 | **0** | **0** | 5 |
+| `data/kurrent` | 1338 | 7 | 139 | 296 |
+| `data/lehekyljed` (etapp 1) | 993 | 17¹ | 17 | 36 |
+
+¹ neist 15 on tühjad, mis treeningust välja filtreeritakse.
+
+Trükimudel ei ole seega näinud **ühtegi** lehte alla 100 märgi; kõige
+hõredamad, mida ta teab, on tiitellehed (~101 märki). Kurrent-poolel on
+hõredaid lehti olemas, aga alla protsendi.
 
 **Kontrollitud 18.08.2026 – ükski andmestik ei sisalda tühja lehekülge:**
 
@@ -178,9 +198,11 @@ ei tohi tekkida – muidu ei õpi mudel seda kui lõpetamismärki.
 
 - **Kogus ~1–3 % lehtedest** – piisav, et muster kinnistuks, aga mitte nii
   palju, et mudel hakkaks tühjust ka kirjutatud lehtedele pakkuma.
-- **Vahepealsed juhud** (leheküljel ainult signatuur, ainult leheküljenumber,
-  ainult tint-plekk) transkribeeritakse tavaliselt – tühja lehe märgend
-  ainult tõesti tühjale.
+- **Hõredad lehed** (ainult leheküljenumber, signatuur, pealkiri, paar rida,
+  tint-plekk) **ei ole tühjad** – need transkribeeritakse tavaliselt, täpselt
+  see, mis lehel on. Neid on treeningandmetesse vaja sama moodi nagu tühje:
+  ilma nendeta ei tea mudel, et lühike vastus võib olla õige vastus. Leht,
+  millel on ainult „42", saab transkriptsiooniks `42`.
 - Ehitaja tühja-teksti filter jääb alles: `[tühi lehekülg]` **ei ole** tühi
   string, seega ta läbib filtri probleemideta. Päriselt 0-baidised lehed
   jäävad edasi välja (need on märgendamata, mitte tühjad).
@@ -217,21 +239,31 @@ juurde panna: allikanimi nt `vutt_tyhjad`, ja `scripts/filter_dataset.py
 märgendamine:
 
 - `scripts/prompt.py`: konstant `EMPTY_PAGE_MARKER = "[tühi lehekülg]"` on
-  ainus tõeallikas ja tühja lehe reegel on lisatud mõlemasse juhisesse –
-  `INSTRUCTION` (trükk/markup) ja `KURRENT_INSTRUCTION` (käsikiri).
+  ainus tõeallikas; mõlemasse juhisesse – `INSTRUCTION` (trükk/markup) ja
+  `KURRENT_INSTRUCTION` (käsikiri) – on lisatud kaks reeglit: tühja lehe
+  märgend ja „hõredat lehte ei tohi täis luuletada".
 - `build_vutt_dataset.py`: uued lipud `--out`, `--append`, `--allikas`,
-  `--only-empty`, `--force` + tühja lehe märgendi kontroll.
+  `--only-empty`, `--max-chars`, `--force` + märgendikontroll ja hõredate
+  lehtede aruanne.
 
-**Käsikirjade tühjade lehtede lisamine 17 000 lk andmestikule:**
+**Käsikirjade tühjade ja hõredate lehtede lisamine 17 000 lk andmestikule:**
 
 ```bash
 # 1. Vaata üle, mis VUTT-ist tuleb (ei kirjuta midagi)
-python scripts/build_vutt_dataset.py --type hand --only-empty --stats
+python scripts/build_vutt_dataset.py --type hand --max-chars 100 --stats
 
-# 2. Lisa Kurrent-andmestikule
-python scripts/build_vutt_dataset.py --type hand --only-empty \
-    --out data/kurrent --append --allikas vutt_tyhjad
+# 2. Lisa Kurrent-andmestikule (tühjad + hõredad ühe käiguga)
+python scripts/build_vutt_dataset.py --type hand --max-chars 100 \
+    --out data/kurrent --append --allikas vutt_horedad
 ```
+
+`--max-chars N` võtab lehed, mille tekstis on kuni N märki (XML-märgendid
+maha arvatud) – tühjad lehed mahuvad alati sisse, sest märgend ise on 15
+märki. Ainult päris tühje lehti annab `--only-empty`. Kui mõlemad lipud on
+korraga, jäävad alles ainult tühjad.
+
+Ilma valikuliputa jooks **loendab ja loetleb** hõredad lehed (≤100 märki),
+aga ei filtreeri midagi – nii on kohe näha, kas neid on üldse.
 
 Mida kontroll teeb:
 
