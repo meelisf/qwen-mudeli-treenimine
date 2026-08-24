@@ -322,7 +322,11 @@ def expand_pdf(pdf_path):
 LOOP_MAX_PERIOD = 5       # SÕNADES; 'A B A B' tüüpi loope on 94 juhtu 250-st
 LOOP_MIN_REPS = 16        # sügaval tühjas vahemikus kahe populatsiooni vahel
 LOOP_TAIL_TOKENS = 512    # dekodeeritav saba; 5 sõna x 16 kordust mahub kindlalt
-LOOP_CHECK_EVERY = 16     # sammu
+# Intervall on ALGARV, mitte 16: kontrollisamm ei tohi jaguda korduse
+# token-pikkusega. Mõõdetud 2026-08-24: '1/2' on 4 tokenit, intervalliga 16
+# maandus iga kontroll täpselt samas faasis (alati sõna keskel) ja 1011 kordust
+# jäi 256 kontrolli jooksul tuvastamata.
+LOOP_CHECK_EVERY = 13     # sammu
 
 
 class KordusLoop(Exception):
@@ -376,7 +380,9 @@ class LoopStopper(StoppingCriteria):
         for rida, saba in enumerate(sabad):
             if rida in self.looped:
                 continue
-            leid = find_tail_loop(saba.split())
+            # Viimane "sõna" on peaaegu alati poolik (kontroll langeb keset
+            # tokenit) ja lõhuks saba-tsükli — viskame ta ära.
+            leid = find_tail_loop(saba.split()[:-1])
             if leid:
                 self.looped[rida] = (leid[0], leid[1], genereeritud)
                 stop[rida] = True
