@@ -387,6 +387,19 @@ class LoopStopper(StoppingCriteria):
         return stop
 
 
+# .err märgendi KATEGOORIAD. Esimene väli failis, sest tellija otsus sõltub
+# vea liigist, mitte sõnumist:
+#   pilt     — skaneeringut ei saa avada (katki, 0 baiti, vale formaat).
+#              Lehte EI SAA käsitsi transkribeerida: pilti ennast ei ole.
+#   mudel    — pilt on korras, mudel ei andnud kasutatavat teksti (kordusloop,
+#              CUDA OOM, tühi leht). Leht ON imporditav ja täidetav käsitsi.
+#   kirjutus — tekst valmis, aga .txt kirjutus ebaõnnestus (nt kadunud kataloog).
+#              Tulemus on olemas, aga kadunud — kordus tasub ära, tühjana import mitte.
+KAT_PILT = "pilt"
+KAT_MUDEL = "mudel"
+KAT_KIRJUTUS = "kirjutus"
+
+
 def write_err_marker(txt_path, exc, kategooria):
     """Kirjutab lehe kõrvale .err märgendi, et tellija saaks vea kohe kätte.
 
@@ -465,7 +478,6 @@ def process_batch(batch_items):
             write_err_marker(txt_out_path, e, KAT_MUDEL)
         for img in images_pil:
             img.close()
-        del images_pil
         torch.cuda.empty_cache()
         return
 
