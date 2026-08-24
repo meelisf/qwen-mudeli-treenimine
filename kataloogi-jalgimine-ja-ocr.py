@@ -29,6 +29,7 @@ from pathlib import Path
 from datetime import datetime
 from PIL import Image as PILImage
 from pdf2image import convert_from_path
+from transformers import StoppingCriteria
 from unsloth import FastVisionModel
 from natsort import natsorted
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "scripts"))
@@ -304,17 +305,102 @@ def expand_pdf(pdf_path):
         except Exception as move_err:
             logger.error(f"Ei suutnud vigast PDF-i teisaldada: {move_err}")
 
-def write_err_marker(txt_path, exc):
+# --- KORDUSLOOPI PEATAMINE (VUTT #227) ---
+# Mudel satub vahel kordusesse ja genereerib laeni — 4096 tokenit prahti ühe lehe
+# kohta, mis on ~15x aeglasem kui terve leht ja hoiab kogu järjekorda kinni.
+# Mõõdetud juhtum 2026-08-24: 'Johan ton Crickebo' x452, 99% lehest, 1367 tokenit.
+#
+# Detektor töötab SÕNADE, mitte token'ite tasemel. Token'ite tasemel oleks periood
+# ebastabiilne: BPE lõhub 'Crickebo' mitmeks tükiks ja reavahetused lähevad kaasa,
+# nii et sõnaperiood 3 on token'ites 7-9. Sõnapõhine on ühtlasi TÄPSELT sama reegel,
+# mis VUTT-i ocr_loop_audit.find_repeat_loop — üks algoritm mõlemas otsas.
+#
+# Läved on mõõdetud VUTT-i korpusel (21 747 lehte, 2026-08-09): pikim järjestikune
+# kordus p95 = 2, p99,5 = 959 — kaks selgelt eraldi populatsiooni, seega läve täpne
+# koht on ebaoluline. Peatamine on rangem kui tuvastus (16 vs 10 kordust), sest
+# valepositiivi hind on siin kaotatud transkriptsioon, mitte üleliigne hoiatus.
+LOOP_MAX_PERIOD = 5       # SÕNADES; 'A B A B' tüüpi loope on 94 juhtu 250-st
+LOOP_MIN_REPS = 16        # sügaval tühjas vahemikus kahe populatsiooni vahel
+LOOP_TAIL_TOKENS = 512    # dekodeeritav saba; 5 sõna x 16 kordust mahub kindlalt
+LOOP_CHECK_EVERY = 16     # sammu
+
+
+class KordusLoop(Exception):
+    """Genereerimine peatati, sest väljund oli kordusloopis."""
+
+
+def find_tail_loop(sonad, max_period=LOOP_MAX_PERIOD, min_reps=LOOP_MIN_REPS):
+    """Kas sõnajärjendi LÕPP on korduv tsükkel? Tagastab (periood, kordused) või None.
+
+    Vaatab ainult saba: loop tuvastatakse siis, kui ta parajasti KESTAB. Varem
+    lõppenud kordus (nt loetelu 'I. II. III.') ei tohi genereerimist peatada.
+    """
+    n = len(sonad)
+    for period in range(1, max_period + 1):
+        if n < period * min_reps:
+            continue
+        muster = sonad[n - period:]
+        reps = 1
+        i = n - 2 * period
+        while i >= 0 and sonad[i:i + period] == muster:
+            reps += 1
+            i -= period
+        if reps >= min_reps:
+            return period, reps
+    return None
+
+
+class LoopStopper(StoppingCriteria):
+    """Peatab kordusesse jäänud RIVI, jättes terved read edasi genereerima.
+
+    prompt_len on kohustuslik: prompt sisaldab pildi kohatäite-tokeneid tuhandeid
+    kordi järjest ja ilma lõikamiseta tuvastaks detektor kohe võltsloopi.
+    """
+
+    def __init__(self, prompt_len):
+        self.prompt_len = prompt_len
+        self.looped = {}      # rea indeks -> (periood, kordused, tokeneid)
+        self.steps = 0
+
+    def __call__(self, input_ids, scores, **kwargs):
+        self.steps += 1
+        stop = torch.zeros(input_ids.shape[0], dtype=torch.bool, device=input_ids.device)
+        for rida in self.looped:
+            stop[rida] = True
+        genereeritud = input_ids.shape[1] - self.prompt_len
+        if self.steps % LOOP_CHECK_EVERY or genereeritud <= 0:
+            return stop
+
+        algus = max(self.prompt_len, input_ids.shape[1] - LOOP_TAIL_TOKENS)
+        sabad = tokenizer.batch_decode(input_ids[:, algus:], skip_special_tokens=True)
+        for rida, saba in enumerate(sabad):
+            if rida in self.looped:
+                continue
+            leid = find_tail_loop(saba.split())
+            if leid:
+                self.looped[rida] = (leid[0], leid[1], genereeritud)
+                stop[rida] = True
+                logger.warning(
+                    "Kordusloop reas {}: periood {} sõna, {} kordust — peatan "
+                    "genereerimise {} tokeni järel".format(
+                        rida, leid[0], leid[1], genereeritud))
+        return stop
+
+
+def write_err_marker(txt_path, exc, kategooria):
     """Kirjutab lehe kõrvale .err märgendi, et tellija saaks vea kohe kätte.
 
     Ilma selleta ei jää ebaõnnestunud lehest failisüsteemi ühtki jälge: VUTT
     näeb ainult ".txt on olemas / ei ole" ja ootab 12 h absoluuttaimerini.
 
+    Sisu kuju: `{kategooria}: {ErandiTüüp}: {sõnum}` — kategooria on ESIMENE,
+    sest tellija otsus (kas lehte saab tühjana importida) sõltub vea liigist.
+
     Kirjutus ise on best-effort — kataloog võib olla katkestamise järel kadunud
     (VUTT ADR 0024) ja see EI TOHI olla uus krahhiallikas.
     """
     err_path = Path(txt_path).with_suffix(".err")
-    msg = "{}: {}".format(type(exc).__name__, exc)
+    msg = "{}: {}: {}".format(kategooria, type(exc).__name__, exc)
     try:
         err_path.write_text(msg[:500] + "\n", encoding="utf-8")
         logger.error("Vea märgend {}: {}".format(err_path.name, msg[:200]))
@@ -343,7 +429,7 @@ def process_batch(batch_items):
             valid_items.append((img_path, txt_path))
         except Exception as e:
             logger.error(f"Viga pildi avamisel {img_path}: {e}")
-            write_err_marker(txt_path, e)
+            write_err_marker(txt_path, e, KAT_PILT)
 
     if not images_pil:
         return
@@ -358,12 +444,14 @@ def process_batch(batch_items):
             padding=True,
         ).to("cuda")
 
+        stopper = LoopStopper(prompt_len=inputs["input_ids"].shape[1])
         with torch.no_grad():
             outputs = model.generate(
                 **inputs,
                 max_new_tokens=4096,
                 do_sample=False,
                 use_cache=True,
+                stopping_criteria=[stopper],
             )
 
         decoded_texts = tokenizer.batch_decode(outputs, skip_special_tokens=True)
@@ -374,7 +462,7 @@ def process_batch(batch_items):
         # .err märgendi ja tsükkel jätkab järgmisega.
         logger.exception(f"Batchi töötlemine ebaõnnestus: {e}")
         for _, txt_out_path in valid_items:
-            write_err_marker(txt_out_path, e)
+            write_err_marker(txt_out_path, e, KAT_MUDEL)
         for img in images_pil:
             img.close()
         del images_pil
@@ -383,6 +471,14 @@ def process_batch(batch_items):
 
     for i, raw_text in enumerate(decoded_texts):
         _, txt_out_path = valid_items[i]
+        if i in stopper.looped:
+            # Loopinud väljund EI OLE transkriptsioon — .err jätab otsuse
+            # tellijale (kustuta leht või proovi uuesti), .txt peidaks prahi ära.
+            periood, kordused, tokeneid = stopper.looped[i]
+            write_err_marker(txt_out_path, KordusLoop(
+                "periood {} sõna, {} kordust — genereerimine peatatud {} tokeni järel".format(
+                    periood, kordused, tokeneid)), KAT_MUDEL)
+            continue
         clean_text = strip_output(raw_text)
         if not clean_text.strip():
             logger.warning(f"Tühi väljund: {os.path.basename(txt_out_path)} — mudel ei genereerinud teksti")
@@ -393,7 +489,7 @@ def process_batch(batch_items):
             # Kataloog võib olla katkestamise järel kadunud (VUTT ADR 0024).
             # Üksik kirjutusviga ei tohi tsüklit ega teenust katkestada.
             logger.error(f"Ei suutnud kirjutada {txt_out_path}: {e}")
-            write_err_marker(txt_out_path, e)
+            write_err_marker(txt_out_path, e, KAT_KIRJUTUS)
             continue
         logger.info(f"Transkribeeritud: {os.path.basename(txt_out_path)}")
 
