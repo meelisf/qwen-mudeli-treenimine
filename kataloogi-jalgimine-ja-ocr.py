@@ -304,6 +304,24 @@ def expand_pdf(pdf_path):
         except Exception as move_err:
             logger.error(f"Ei suutnud vigast PDF-i teisaldada: {move_err}")
 
+def write_err_marker(txt_path, exc):
+    """Kirjutab lehe kõrvale .err märgendi, et tellija saaks vea kohe kätte.
+
+    Ilma selleta ei jää ebaõnnestunud lehest failisüsteemi ühtki jälge: VUTT
+    näeb ainult ".txt on olemas / ei ole" ja ootab 12 h absoluuttaimerini.
+
+    Kirjutus ise on best-effort — kataloog võib olla katkestamise järel kadunud
+    (VUTT ADR 0024) ja see EI TOHI olla uus krahhiallikas.
+    """
+    err_path = Path(txt_path).with_suffix(".err")
+    msg = "{}: {}".format(type(exc).__name__, exc)
+    try:
+        err_path.write_text(msg[:500] + "\n", encoding="utf-8")
+        logger.error("Vea märgend {}: {}".format(err_path.name, msg[:200]))
+    except Exception as e:
+        logger.error("Ei suutnud .err märgendit kirjutada {}: {}".format(err_path, e))
+
+
 def process_batch(batch_items):
     """
     Töötleb ühe batchi pilte.
@@ -325,36 +343,58 @@ def process_batch(batch_items):
             valid_items.append((img_path, txt_path))
         except Exception as e:
             logger.error(f"Viga pildi avamisel {img_path}: {e}")
+            write_err_marker(txt_path, e)
 
     if not images_pil:
         return
 
-    chat_template = get_chat_template()
-    inputs = tokenizer(
-        images_pil,
-        [chat_template] * len(images_pil),
-        add_special_tokens=False,
-        return_tensors="pt",
-        padding=True,
-    ).to("cuda")
+    try:
+        chat_template = get_chat_template()
+        inputs = tokenizer(
+            images_pil,
+            [chat_template] * len(images_pil),
+            add_special_tokens=False,
+            return_tensors="pt",
+            padding=True,
+        ).to("cuda")
 
-    with torch.no_grad():
-        outputs = model.generate(
-            **inputs,
-            max_new_tokens=4096,
-            do_sample=False,
-            use_cache=True,
-        )
+        with torch.no_grad():
+            outputs = model.generate(
+                **inputs,
+                max_new_tokens=4096,
+                do_sample=False,
+                use_cache=True,
+            )
 
-    decoded_texts = tokenizer.batch_decode(outputs, skip_special_tokens=True)
+        decoded_texts = tokenizer.batch_decode(outputs, skip_special_tokens=True)
+    except Exception as e:
+        # Terve batch kukkus (nt CUDA OOM). Varem propageerus erand main_loop'ist
+        # mooduli tasemele, kus on sys.exit(1) — see tappis TERVE teenuse ja
+        # katkestas kõigi kasutajate järjekorra. Nüüd saab iga selle batchi leht
+        # .err märgendi ja tsükkel jätkab järgmisega.
+        logger.exception(f"Batchi töötlemine ebaõnnestus: {e}")
+        for _, txt_out_path in valid_items:
+            write_err_marker(txt_out_path, e)
+        for img in images_pil:
+            img.close()
+        del images_pil
+        torch.cuda.empty_cache()
+        return
 
     for i, raw_text in enumerate(decoded_texts):
         _, txt_out_path = valid_items[i]
         clean_text = strip_output(raw_text)
         if not clean_text.strip():
             logger.warning(f"Tühi väljund: {os.path.basename(txt_out_path)} — mudel ei genereerinud teksti")
-        with open(txt_out_path, "w", encoding="utf-8") as f:
-            f.write(clean_text)
+        try:
+            with open(txt_out_path, "w", encoding="utf-8") as f:
+                f.write(clean_text)
+        except Exception as e:
+            # Kataloog võib olla katkestamise järel kadunud (VUTT ADR 0024).
+            # Üksik kirjutusviga ei tohi tsüklit ega teenust katkestada.
+            logger.error(f"Ei suutnud kirjutada {txt_out_path}: {e}")
+            write_err_marker(txt_out_path, e)
+            continue
         logger.info(f"Transkribeeritud: {os.path.basename(txt_out_path)}")
 
     for img in images_pil:
@@ -392,10 +432,14 @@ def main_loop():
                  if f.suffix.lower() in EXTENSIONS and f.is_file()],
                 key=lambda x: str(x)
             )
+            # .err märgend on LÕPLIK: ilma selle tingimuseta võtaks teenus
+            # vigase lehe igal tsüklil uuesti ette, põletaks GPU-d ja kirjutaks
+            # märgendi lõputult üle. Kordus = tellija kustutab .err faili.
             tasks_by_type[mt] = [
                 (str(img), str(img.with_suffix(".txt")))
                 for img in candidates
                 if not img.with_suffix(".txt").exists()
+                and not img.with_suffix(".err").exists()
             ]
 
         total = sum(len(v) for v in tasks_by_type.values())
