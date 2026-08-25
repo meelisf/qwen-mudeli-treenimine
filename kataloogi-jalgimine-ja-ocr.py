@@ -319,9 +319,20 @@ def expand_pdf(pdf_path):
 # kordus p95 = 2, p99,5 = 959 — kaks selgelt eraldi populatsiooni, seega läve täpne
 # koht on ebaoluline. Peatamine on rangem kui tuvastus (16 vs 10 kordust), sest
 # valepositiivi hind on siin kaotatud transkriptsioon, mitte üleliigne hoiatus.
-LOOP_MAX_PERIOD = 5       # SÕNADES; 'A B A B' tüüpi loope on 94 juhtu 250-st
+# Periood 5 -> 20 (2026-08-25). Töö 5qdpq4 (47 lk, 20 min) kaotas kaks partiid
+# loopidele, mida periood 5 ei näinud: lk 45 'Bruks Dagh / För år D:r Lax' = 6
+# sõna x 315 kordust, lk 21 mitmerealine plokk = 17 sõna x 87 kordust. Mõlemad
+# genereerisid laeni (4096 tokenit) ja hoidsid kogu partiid 5,5 min kinni, kus
+# terve partii teeb ~45 s. MITMEREALINE korduv plokk (tabeli päis + rida) on
+# eraldi populatsioon, mida 2026-08-09 mõõtmine ei tabanud — see mõõtis lühikesi
+# perioode. Pikem periood ei saa anda ROHKEM kordusi kui lühem, seega on 20
+# lühikese perioodi range ülemhulk, mitte selle asendus.
+LOOP_MAX_PERIOD = 20      # SÕNADES; 'A B A B' tüüpi loope on 94 juhtu 250-st
 LOOP_MIN_REPS = 16        # sügaval tühjas vahemikus kahe populatsiooni vahel
-LOOP_TAIL_TOKENS = 512    # dekodeeritav saba; 5 sõna x 16 kordust mahub kindlalt
+# Saba PEAB mahutama max_period x min_reps sõna, muidu jääb pikk periood ikka
+# tabamata: 20 x 16 = 320 sõna, mis varauusaegse ortograafia BPE-tükeldusega on
+# ~900-1200 tokenit. 512 mahutas ainult perioodi 5.
+LOOP_TAIL_TOKENS = 1536   # dekodeeritav saba; 20 sõna x 16 kordust mahub kindlalt
 # Intervall on ALGARV, mitte 16: kontrollisamm ei tohi jaguda korduse
 # token-pikkusega. Mõõdetud 2026-08-24: '1/2' on 4 tokenit, intervalliga 16
 # maandus iga kontroll täpselt samas faasis (alati sõna keskel) ja 1011 kordust
