@@ -57,6 +57,7 @@ MODEL_PATH = "models/qwen3.5-ocr-kurrent-20260602"
 PROMPT_KIND = "kurrent"
 LIMIT = None
 MAX_NEW_TOKENS = 4096
+BATCH = 4          # sama mis teenuses; tipp ~24,6 GB / 32,6 GB
 RESUME = "--resume" in sys.argv
 DRY_RUN = "--dry-run" in sys.argv   # kontrolli nimekiri üle, mudelit ei laeta
 
@@ -76,6 +77,10 @@ while i < len(args):
         MAX_NEW_TOKENS = int(args[i + 1]); i += 2
     elif a.startswith("--max-new-tokens="):
         MAX_NEW_TOKENS = int(a.split("=", 1)[1]); i += 1
+    elif a == "--batch" and i + 1 < len(args):
+        BATCH = int(args[i + 1]); i += 2
+    elif a.startswith("--batch="):
+        BATCH = int(a.split("=", 1)[1]); i += 1
     elif a.startswith("--"):
         i += 1                      # --resume jt lipud
     else:
@@ -129,6 +134,7 @@ out_dir.mkdir(parents=True, exist_ok=True)
 print(f"Mudel:   {MODEL_PATH}")
 print(f"Juhis:   {PROMPT_KIND}")
 print(f"Lehti:   {len(holdout)}")
+print(f"Batch:   {BATCH}")
 print(f"Väljund: {out_dir}")
 
 if DRY_RUN:
@@ -177,57 +183,110 @@ def wer(ref: str, hyp: str) -> float:
     return editdistance.eval(r, h) / len(r)
 
 
-rows = []
-t0 = time.time()
-for n, (allikas, failinimi) in enumerate(holdout, 1):
-    name = Path(failinimi).stem
-    out_path = out_dir / f"{name}.txt"
-    ref = gt[failinimi].strip()
+import re
 
-    if RESUME and out_path.exists():
-        hyp = out_path.read_text(encoding="utf-8").strip()
-    else:
-        img_path = DATA_IMAGES / Path(failinimi).name
-        if not img_path.exists():
-            print(f"[{n}/{len(holdout)}] PUUDUB pilt: {img_path}")
-            continue
-        image = PILImage.open(img_path).convert("RGB")
-        messages = [{"role": "user", "content": [
+
+def strip_output(text: str) -> str:
+    """Sama puhastus mis teenuses: think-plokid, assistendi markerid, koodiplokid.
+
+    Batchis on promptid eri pikkusega (pildi tokenite arv erineb), seega
+    lõikame prompti ära markeri järgi, mitte indeksi järgi.
+    """
+    text = re.sub(r"<think>.*?</think>", "", text, flags=re.DOTALL)
+    for marker in ["</assistant>", "<|assistant|>", "<|im_start|>assistant", "assistant\n"]:
+        if marker in text:
+            text = text.split(marker, 1)[-1]
+    text = re.sub(r"^```[a-z]*\n?", "", text.strip())
+    text = re.sub(r"\n?```$", "", text)
+    return text.strip()
+
+
+def genereeri(images):
+    """Üks batch pilte -> list puhastatud väljundeid."""
+    chat = tokenizer.apply_chat_template(
+        [{"role": "user", "content": [
             {"type": "text",  "text": PROMPT},
             {"type": "image"},
-        ]}]
-        text = tokenizer.apply_chat_template(
-            messages, add_generation_prompt=True, enable_thinking=False
+        ]}],
+        add_generation_prompt=True, enable_thinking=False,
+    )
+    inputs = tokenizer(
+        images, [chat] * len(images),
+        add_special_tokens=False, return_tensors="pt", padding=True,
+    ).to("cuda")
+    with torch.no_grad():
+        outputs = model.generate(
+            **inputs, max_new_tokens=MAX_NEW_TOKENS, do_sample=False, use_cache=True,
         )
-        inputs = tokenizer(image, text, add_special_tokens=False, return_tensors="pt").to("cuda")
-        with torch.no_grad():
-            outputs = model.generate(
-                **inputs,
-                max_new_tokens=MAX_NEW_TOKENS,
-                do_sample=False,
-                use_cache=True,
-            )
-        hyp = tokenizer.decode(
-            outputs[0][inputs["input_ids"].shape[1]:], skip_special_tokens=True
-        ).strip()
-        out_path.write_text(hyp, encoding="utf-8")
+    decoded = tokenizer.batch_decode(outputs, skip_special_tokens=True)
+    del inputs, outputs
+    torch.cuda.empty_cache()
+    return [strip_output(t) for t in decoded]
 
+
+rows = []
+t0 = time.time()
+tehtud = 0
+
+# Resume: valmis lehed loeme kettalt, ülejäänud lähevad batchidesse
+ootel = []
+for allikas, failinimi in holdout:
+    out_path = out_dir / f"{Path(failinimi).stem}.txt"
+    if RESUME and out_path.exists():
+        rows.append((allikas, failinimi, out_path.read_text(encoding="utf-8").strip()))
+    else:
+        ootel.append((allikas, failinimi))
+
+if rows:
+    print(f"Resume: {len(rows)} lehte juba olemas, jäänud {len(ootel)}\n")
+
+for algus in range(0, len(ootel), BATCH):
+    grupp = ootel[algus:algus + BATCH]
+    images, kehtivad = [], []
+    for allikas, failinimi in grupp:
+        img_path = DATA_IMAGES / Path(failinimi).name
+        if not img_path.exists():
+            print(f"PUUDUB pilt: {img_path}")
+            continue
+        images.append(PILImage.open(img_path).convert("RGB"))
+        kehtivad.append((allikas, failinimi))
+    if not images:
+        continue
+
+    try:
+        valjundid = genereeri(images)
+    except torch.cuda.OutOfMemoryError:
+        # Batch ei mahtunud – proovi ükshaaval, et jooks ei kukuks
+        print("  OOM – proovin ükshaaval")
+        torch.cuda.empty_cache()
+        valjundid = []
+        for img in images:
+            valjundid.extend(genereeri([img]))
+
+    for (allikas, failinimi), hyp in zip(kehtivad, valjundid):
+        (out_dir / f"{Path(failinimi).stem}.txt").write_text(hyp, encoding="utf-8")
+        rows.append((allikas, failinimi, hyp))
+        tehtud += 1
+
+    for img in images:
+        img.close()
+
+    kulunud = time.time() - t0
+    print(f"[{algus + len(kehtivad)}/{len(ootel)}] {kulunud / 60:5.1f} min"
+          f"  ({kulunud / max(tehtud, 1):4.1f} s/lk)")
+
+# Mõõdikud
+tulemused = []
+for allikas, failinimi, hyp in rows:
+    ref = gt[failinimi].strip()
     ratio = len(hyp) / max(len(ref), 1)
-    c, w = cer(ref, hyp), wer(ref, hyp)
-    rows.append({
+    tulemused.append({
         "failinimi": failinimi, "allikas": allikas,
         "gt_chars": len(ref), "out_chars": len(hyp),
-        "ratio": round(ratio, 3), "cer": round(c, 4), "wer": round(w, 4),
+        "ratio": round(ratio, 3),
+        "cer": round(cer(ref, hyp), 4), "wer": round(wer(ref, hyp), 4),
     })
-
-    lipp = ""
-    if ratio < 0.7:
-        lipp = "  <- LÜHIKE (vahelejätt?)"
-    elif ratio > 1.4:
-        lipp = "  <- PIKK (loop?)"
-    kulunud = time.time() - t0
-    print(f"[{n}/{len(holdout)}] {allikas:24s} CER {c:6.1%}  ratio {ratio:5.2f}"
-          f"  {kulunud / n:5.1f} s/lk{lipp}")
+rows = tulemused
 
 # ---------------------------------------------------------------------------
 # Kokkuvõte

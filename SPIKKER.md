@@ -124,7 +124,15 @@ Lehed, mida parandus ainult vormistab ja mis vajavad VUTT-is käsitsi
 parandust (liigne `<m>` keset sõna, dubleeritud `<i>`), on loetletud failis
 `docs/katkised-lehed-20260721.txt`.
 
-### ⚠️ Tühjad ja hõredad leheküljed treeningandmetes (lahendamata)
+### Tühjad ja hõredad leheküljed treeningandmetes
+
+**Seis 26.08.2026:** käsikirjapool on tehtud – `data/kurrent/metadata.csv`
+sisaldab 23 `[tühi lehekülg]` ja 3 hõredat lehte (allikas `vutt_horedad`).
+Trükipool (`data/vutt`) on tegemata. Praktikas selgus, et **ainuüksi prompti
+täiendus lõpetas loopi jooksmise tühjadel lehtedel** – treeningnäited on
+pigem kindlustus, et uus peenhäälestus seda käitumist ära ei nulliks.
+Allpool on probleemi algne kirjeldus ja nõuded, mis kehtivad edasi.
+
 
 **Probleem:** kui mudelile anda tühi (või peaaegu tühi) lehekülg, läheb ta
 loopi ja genereerib maksimumini täiesti suvalist teksti. Tagajärg on
@@ -330,6 +338,104 @@ Tulemus: `models/qwen3.5-ocr-markup-YYYYMMDD/`
 
 ---
 
+## Kurrent-treening (käsikiri) — töökäik algusest lõpuni
+
+Seis 26.08.2026: **andmestik ja tööriistad on valmis, jooks ootab
+käivitamist** (plaanitud reede 28.08 pärastlõunal, kestab nädalavahetuse).
+Trükimudelit see ei puuduta – Kurrent on eraldi mudel.
+
+### Enne käivitamist
+
+| # | Käsk | Mida oodata |
+|---|---|---|
+| 1 | `sudo systemctl stop ocr-service` | teenus hoiab GPU-l ~20 GB |
+| 2 | `nvidia-smi --query-gpu=memory.used --format=csv,noheader` | alla 1000 MiB |
+| 3 | `sudo nvidia-smi -pl 450` | lähtestub iga reboodiga |
+| 4 | `echo 1 \| sudo tee /sys/devices/system/cpu/intel_pstate/no_turbo` | CPU 77 °C → 55 °C |
+| 5 | `tmux new -s kurrent` | 33-tunnine jooks ei tohi SSH otsa surra |
+| 6 | `venv/bin/python scripts/train_kurrent.py --test` | 5 sammu, ~5 min |
+
+Testjooksu väljundis PEAB seisma täpselt see:
+
+```
+Lähtepunkt:    unsloth/Qwen3.5-9B
+LoRA rank: 64
+  Holdout: 73 lehte treeningust välja (data/kurrent/holdout.txt)
+  Andmestik: 16971 näidet
+```
+
+Kui lähtepunkt on mõni `models/...` või rank 16 – **peatu**, vaikeväärtused on
+jälle valed ja tulemuseks oleks hoopis teine mudel (vt commit a02a86c).
+
+### Täisjooks
+
+```bash
+venv/bin/python scripts/train_kurrent.py 2>&1 | tee /tmp/kurrent-treening.log
+```
+
+Ootused: **2121 sammu epohhis, 2 epohhi = 4242 sammu, ~27,9 s/samm ≈ 33 h.**
+Väljund `models/qwen3.5-ocr-kurrent-YYYYMMDD` (kuupäev = käivitamise päev),
+checkpointid `models/checkpoints-kurrent-YYYYMMDD/` (iga epohhi järel).
+
+Lossi võrdluspunktid eelmisest jooksust (20260602) – kui number on
+kordades suurem, on midagi valesti:
+
+| samm | loss |
+|---|---|
+| 10 | 1,5 |
+| 100 | 0,60 |
+| 1589 (epohh 1 lõpp) | 0,12 |
+| 3178 (epohh 2 lõpp) | 0,08 |
+
+### Pärast treeningut
+
+```bash
+venv/bin/python scripts/eval_kurrent.py models/qwen3.5-ocr-kurrent-YYYYMMDD
+```
+
+73 holdout-lehte, batch 4, ~25 min. Võrdle vana mudeli baseline'iga
+(26.08.2026, `data/kurrent/eval/qwen3.5-ocr-kurrent-20260602/results.csv`):
+
+| | CER | mediaan | loope |
+|---|---|---|---|
+| kõik 73 lk | 13,9 % | 6,6 % | 2 |
+| 50 lk, mida vana mudel NÄGI | 9,9 % | 6,4 % | 1 |
+| 23 lk, mida ei näinud (aaeb, hanse, dresdner, senats) | 22,6 % | 8,6 % | 1 |
+
+**Vaata neid 23 lehte** – ainult need on aus võrdlus, ülejäänud 50 on vanal
+mudelil treeningust meeles. Vaata ka `ratio` veergu: alla 0,7 = pool lehte
+jäi transkribeerimata, üle 1,4 = loop. Vana mudel loopis 2 lehel, neist
+`16590_senatsp_UAT_047_19_017` (hõre kohalolijate nimekiri) genereeris „S."
+4096 tokenini. Senatsprotokollid ja dresdner_1665 on nüüd treeningandmetes,
+seega peaks just see paranema – kui ei parane, ei olnud andmete lisamine
+lahendus.
+
+CER mõõdab vastavust arhiivikorpuse tavadele, mitte VUTT-i kasulikkust.
+Otsust ei tee ainult numbri põhjal – lase paar päris lehte re-OCR-i läbi ja
+vaata silmaga. Tühja lehe käitumist saab kontrollida ilma GT-ta: võta
+VUTT-ist märgendamata tühi versopool ja vaata, kas tuleb `[tühi lehekülg]`.
+
+### Aktiveerimine
+
+Käsikirjamudel elab `kataloogi-jalgimine-ja-ocr.py` failis:
+
+```python
+MODEL_CONFIGS = {
+    "print": "models/qwen3.5-ocr-markup-20260722",
+    "hand":  "models/qwen3.5-ocr-kurrent-20260602",   # <- see rida
+}
+```
+
+Pärast muutmist `sudo systemctl restart ocr-service`. Tagasi keeramine =
+sama rida vana teega, teenus taaskäivitada.
+
+**NB!** Teenus saadab käsikirjamudelile `INSTRUCTION`-i (trüki/markup juhis),
+kuigi mudel on treenitud `KURRENT_INSTRUCTION`-iga. See on olnud nii algusest
+peale. Mõõda see ära enne kui parandad:
+`scripts/eval_kurrent.py --prompt print` annab sama 73 lehte teise juhisega.
+
+---
+
 ## Mudeli testimine
 
 Enne aktiveerimist testi treenitud mudelit `data/test/` piltidega:
@@ -379,15 +485,22 @@ sudo systemctl start ocr-service
 | `data/lehekyljed/` | 1500 lk, Kreeka + ladina, puhas tekst | etapp 1 treening |
 | `data/processed/` | 136 lk, käsitsi märgendatud, markup | markup treening |
 | `data/vutt/` | VUTT Valmis lehed, markup | markup treening |
+| `data/kurrent/` | 17 044 lk käsikirja, 13 allikat + `vutt_horedad` | Kurrent treening |
+| `data/kurrent/holdout.txt` | 73 lk, treeningust väljas | mudelite võrdlus |
 | `~/vutt-backups/latest/data` | VUTT backup-snapshot (öine cron) | lähteandmed |
 
 ## Mudelid
 
 | Kataloog | Sisu |
 |---|---|
-| `models/qwen3.5-ocr-lora/` | **aktiivne mudel** (ocr-service kasutab) |
-| `models/qwen3.5-ocr-lora-stage2/` | vanem markup mudel (136 lk) |
-| `models/qwen3.5-ocr-markup-YYYYMMDD/` | uued treenitud checkpointid |
+| `models/qwen3.5-ocr-markup-20260722/` | **aktiivne trükimudel** (ocr-service, `print`) |
+| `models/qwen3.5-ocr-kurrent-20260602/` | **aktiivne käsikirjamudel** (ocr-service, `hand`) |
+| `models/qwen3.5-ocr-lora-backup-20260527/` | etapp 1, puhas transkriptsioon – markup-treeningu lähtepunkt |
+| `models/qwen3.5-ocr-markup-YYYYMMDD/` | uued trükimudeli checkpointid |
+| `models/qwen3.5-ocr-kurrent-YYYYMMDD/` | uued käsikirjamudeli checkpointid |
+
+Aktiivsed teed on `kataloogi-jalgimine-ja-ocr.py` failis `MODEL_CONFIGS`-is;
+koopiaid `models/qwen3.5-ocr-lora/` alla enam ei tehta.
 
 ---
 
