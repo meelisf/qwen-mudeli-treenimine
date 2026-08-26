@@ -1,0 +1,8 @@
+
+raw_dir: /home/mf/vutt-backups/snapshots/20260826T192622Z/data
+ehitatud: 2026-08-26T22:28:01
+lehti: 17  (--type hand, --append allikas=vutt_horedad)
+
+raw_dir: /home/mf/vutt-backups/snapshots/20260826T194357Z/data
+ehitatud: 2026-08-26T22:44:17
+lehti: 9  (--type hand, --append allikas=vutt_horedad)

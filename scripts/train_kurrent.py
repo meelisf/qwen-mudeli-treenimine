@@ -9,11 +9,22 @@ Treenib käsikirja transkribeerimise oskust 12K+ lehekülge peal:
   - 18. saj rootsi kohtudokumendid (svea hovratt)
   - 13.-15. saj keskaeg (koenigsfelden)
 
-Baasmudeliks qwen3.5-ocr-lora-backup-20260527 (trükiteksti OCR-LoRA).
+Baasmudeliks PUHAS `unsloth/Qwen3.5-9B`, LoRA r=64. NB! Mitte trükimudel –
+mudel qwen3.5-ocr-kurrent-20260602 (see, mis töötab hästi) tehti puhtast
+baasist. Vaikeväärtused siin vastavad sellele retseptile; ära muuda neid
+ilma põhjuseta, muidu pole uus jooks vanaga võrreldav.
+
+20260602 retsept (tõendid: models/checkpoints-kurrent-20260602/checkpoint-3178/
+training_args.bin ja trainer_state.json):
+  baas unsloth/Qwen3.5-9B, r=64/alpha=64, bs 1 x grad_acc 8, LR 2e-4 cosine,
+  warmup 80, 2 epohhi, adamw_8bit, wd 0.01, seed 3407, bf16.
+  12 712 naidet epohhis, 27,9 s/samm, epohh 12,3 h, loss 1,52 -> 0,10.
+  Teine epohh andis vahe (0,12 -> 0,08), epohhi-1 checkpoint jaab alles.
+
 Väljund: models/qwen3.5-ocr-kurrent-YYYYMMDD  (eraldi mudel, ei asenda OCR teenust)
 
 Käivitamine:
-  python scripts/train_kurrent.py           # täistreening
+  python scripts/train_kurrent.py           # täistreening, 20260602 retsept
   python scripts/train_kurrent.py --test    # kiirtest, 5 sammu, ei salvestata
   python scripts/train_kurrent.py --base models/muu-checkpoint
 """
@@ -42,8 +53,8 @@ if TEST_MODE:
 # Konfiguratsioon
 # ---------------------------------------------------------------------------
 
-BASE_MODEL = "models/qwen3.5-ocr-lora-backup-20260527"
-LORA_RANK = 16
+BASE_MODEL = "unsloth/Qwen3.5-9B"   # vt docstring: 20260602 retsept
+LORA_RANK = 64                      # r=16 ei mahuta 17k lk mitmesajandilist korpust
 CUSTOM_STEPS = -1  # -1 = täisepohh
 
 for i, arg in enumerate(sys.argv):
