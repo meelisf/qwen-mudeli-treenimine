@@ -40,3 +40,6 @@ outputs*/
 
 # Süsteemifailid
 .DS_Store
+
+# Eval-väljundid (mudelite tekstid, taastekitatavad)
+data/kurrent/eval/

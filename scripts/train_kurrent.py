@@ -76,6 +76,13 @@ if not FROM_CHECKPOINT:
 DATA_CSV    = "data/kurrent/metadata.csv"
 DATA_IMAGES = "data/kurrent/images"
 
+# Holdout: ~70 lehte, mis jäävad treeningust välja, et mudeleid saaks
+# omavahel võrrelda. Nimekirja teeb scripts/make_holdout.py ja see on
+# repositooriumis – ilma selleta ei ole hilisem võrdlus aus.
+# --no-holdout treenib kõige peal (nt lõplik mudel pärast katsetamist).
+HOLDOUT_PATH = "data/kurrent/holdout.txt"
+USE_HOLDOUT  = "--no-holdout" not in sys.argv
+
 DATE_STAMP  = datetime.now().strftime("%Y%m%d")
 OUTPUT_PATH = f"models/qwen3.5-ocr-kurrent-{DATE_STAMP}"
 CKPT_DIR    = f"models/checkpoints-kurrent-{DATE_STAMP}"
@@ -141,16 +148,35 @@ model.print_trainable_parameters()
 # Andmestik
 # ---------------------------------------------------------------------------
 
+def _load_holdout(path):
+    """Holdout-failist failinimede hulk (ilma kaustata, nagu CSV-s)."""
+    holdout = set()
+    if not (USE_HOLDOUT and Path(path).exists()):
+        return holdout
+    with open(path, encoding="utf-8") as f:
+        for line in f:
+            line = line.strip()
+            if not line or line.startswith("#"):
+                continue
+            holdout.add(os.path.basename(line.split("\t")[-1]))
+    return holdout
+
+
 class KurrentAndmestik:
     def __init__(self, csv_path, images_dir):
         self.samples = []
         skipped = 0
+        holdout = _load_holdout(HOLDOUT_PATH)
+        held = 0
 
         with open(csv_path, encoding="utf-8", newline="") as f:
             for row in csv.DictReader(f):
                 t = row.get("transkriptsioon", "")
                 if not isinstance(t, str) or not t.strip():
                     skipped += 1
+                    continue
+                if os.path.basename(row["failinimi"]) in holdout:
+                    held += 1
                     continue
                 img_path = os.path.join(images_dir, os.path.basename(row["failinimi"]))
                 if not os.path.exists(img_path):
@@ -163,6 +189,12 @@ class KurrentAndmestik:
 
         if skipped:
             print(f"  Hoiatus: {skipped} rida vahele jäetud (puuduv pilt/tekst)")
+        if held:
+            print(f"  Holdout: {held} lehte treeningust välja ({HOLDOUT_PATH})")
+        elif USE_HOLDOUT:
+            print(f"  Holdout: nimekirja ei leitud ({HOLDOUT_PATH}) – treenin kõige peal")
+        else:
+            print("  Holdout: --no-holdout, treenin kõige peal")
         print(f"  Andmestik: {len(self.samples)} näidet")
 
     def __len__(self):
