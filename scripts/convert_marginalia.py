@@ -203,6 +203,11 @@ def remove_empty_m_tags(text: str) -> str:
 #: katkise pesastuse: just <annN> on see, mis lõikub üle <i>/<cs>/<m> piiride.
 UNWRAP_TAGS = ("ann1", "ann2", "ann3", "ann4")
 
+#: Sama, aga numbrist sõltumatult. VUTT-i varukoopias on ka ann5–ann14
+#: (30 esinemist, 3 failis) – fikseeritud nimekiri jättis need sisse ja need
+#: oleksid lekkinud treeningandmetesse niipea, kui selline leht saab „Valmis".
+_ANN_RE = re.compile(r"</?ann\d+\s*/?>")
+
 #: <noodid> jääb ALLES – see märgib kohta, kus lehel on noodikiri. Ilma selleta
 #: satub mudel noote nähes segadusse ja hakkab neid transkribeerida püüdma;
 #: märgendiga paneb ta märke ja liigub edasi.
@@ -215,6 +220,8 @@ def unwrap_tags(text: str, tags: tuple = UNWRAP_TAGS) -> str:
     """
     for tag in tags:
         text = re.sub(rf"</?{tag}\s*/?>", "", text)
+    if tags is UNWRAP_TAGS:
+        text = _ANN_RE.sub("", text)
     return text
 
 
@@ -346,6 +353,36 @@ def remove_empty_tags(text: str) -> str:
     return text.strip()
 
 
+#: <m> sisu kursiiv eemaldatakse. Põhjus ei ole tehniline, vaid andmete oma:
+#: märgendus on teoste vahel vasturääkiv. 64 teosest, kus on ≥15 <m>, on 22-l
+#: marginaalide kursiiv märkimata ja 37-l märgitud – ja jaotus ei järgi
+#: trükikoda ega aastat (Academia Gustaviana oratsioonid 1633–1650 jagunevad
+#: 14 vs 30, samad aastad läbisegi). Viies teoses on märgendus tüpograafiliselt
+#: tagurpidi: põhitekst 70–85 % kursiivis, marginaalides mitte ühtegi <i>-d
+#: (1636-9, 1646-7, 1647-10, 1646-1, 1700-2 – kokku ~390 <m> tagi).
+#:
+#: Mudel näeb seega sama visuaalset mustrit kord tagituna, kord mitte, ilma
+#: nähtava vaheta – vasturääkiv signaal täpselt SELLE märgendi sees, mis on
+#: ainus kohustuslik (vt docs/plaan-trukipool-jargmine-treening.md punkt 0b).
+#:
+#: Normaliseerida saab ainult ühes suunas: ära võtta saab, juurde panna ei
+#: saa, sest me ei tea, kumb pool on trükitõde. Kuna marginaalide kursiiv ei
+#: ole nõue, on äravõtmine õige suund.
+_M_BLOCK_RE = re.compile(r"<m>(.*?)</m>", re.S)
+_I_TAG_RE = re.compile(r"</?i>")
+
+
+def strip_italics_in_marginalia(text: str) -> str:
+    """Eemaldab <i>-märgendid <m> plokkide seest, sisu jääb alles.
+
+    <m><i>Gothi in</i></m>        →  <m>Gothi in</m>
+    <m>Origo <i>Massagetharum</i></m>  →  <m>Origo Massagetharum</m>
+
+    Väljaspool <m>-i jääb <i> puutumata.
+    """
+    return _M_BLOCK_RE.sub(lambda mo: "<m>" + _I_TAG_RE.sub("", mo.group(1)) + "</m>", text)
+
+
 def clean_markup(text: str) -> str:
     """Viib VUTT markup'i treeningu kanoonilisele kujule.
 
@@ -361,6 +398,7 @@ def clean_markup(text: str) -> str:
         cleaned = flatten_redundant_nested_tags(cleaned)
         cleaned = normalize_multiline_m_tags(cleaned)
         cleaned = balance_line_m_tags(cleaned)
+        cleaned = strip_italics_in_marginalia(cleaned)
         cleaned = remove_empty_m_tags(cleaned)
         cleaned = remove_empty_tags(cleaned)
         if cleaned == text:
