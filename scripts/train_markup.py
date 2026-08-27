@@ -44,23 +44,54 @@ if TEST_MODE:
 # Konfid
 # ---------------------------------------------------------------------------
 
-# Etapp 1 checkpoint (baas) – backup enne markup treeningut
+# Etapp 1 checkpoint (baas) – backup enne markup treeningut.
+# `--base=unsloth/Qwen3.5-9B` treenib hoopis PUHTALT BAASILT: siis luuakse uus
+# adapter (vt FROM_CHECKPOINT allpool) ja `data/lehekyljed` tuleb kaasa võtta,
+# muidu kaob kreeka signaal. Vt docs/plaan-trukipool-jargmine-treening.md, 0c.
 BASE_MODEL = "models/qwen3.5-ocr-lora-backup-20260527"
-for arg in sys.argv:
+LORA_RANK = 16          # kehtib ainult siis, kui adapter luuakse uuena
+for i, arg in enumerate(sys.argv):
     if arg.startswith("--base="):
         BASE_MODEL = arg.split("=", 1)[1]
-    elif arg == "--base" and sys.argv.index(arg) + 1 < len(sys.argv):
-        BASE_MODEL = sys.argv[sys.argv.index(arg) + 1]
+    elif arg == "--base" and i + 1 < len(sys.argv):
+        BASE_MODEL = sys.argv[i + 1]
+    elif arg.startswith("--lora-rank="):
+        LORA_RANK = int(arg.split("=", 1)[1])
 
-# Andmeallikad – ainult VUTT märgendatud materjal
+# Kas baas on lokaalne checkpoint (LoRA juba küljes) või HF baasmudel?
+FROM_CHECKPOINT = Path(BASE_MODEL).exists()
+FRESH = not FROM_CHECKPOINT     # uus adapter → teine LR-retsept, vt SFTConfig
+
+# Andmeallikad. `data/lehekyljed` on 1. etapi 1500 lehte – ilma märgenduseta,
+# aga see on AINUS kreekaallikas (559 kreekarikkast lehest 549). Checkpointist
+# jätkates on nad juba adapteris ja teist korda ei ole vaja; baasilt treenides
+# on. `--ainult-vutt` lülitab nad käsitsi välja.
 DATA_SOURCES = [
     {"csv": "data/vutt/metadata.csv", "images": "data/vutt/images"},
 ]
+if not FROM_CHECKPOINT and "--ainult-vutt" not in sys.argv:
+    DATA_SOURCES.append(
+        {"csv": "data/lehekyljed/metadata_markup.csv", "images": "data/lehekyljed/images"}
+    )
+
+# Holdout: lehed, mis jäävad treeningust välja, et uut ja vana mudelit saaks
+# samal materjalil võrrelda. Nimekirja teeb scripts/make_holdout_print.py.
+HOLDOUT_PATH = Path("data/vutt/holdout.txt")
+USE_HOLDOUT = "--no-holdout" not in sys.argv
+HOLDOUT = set()
+if USE_HOLDOUT and HOLDOUT_PATH.exists():
+    HOLDOUT = {
+        r.strip() for r in HOLDOUT_PATH.read_text(encoding="utf-8").splitlines()
+        if r.strip() and not r.startswith("#")
+    }
 
 # Kuupäevaga väljundkausta nimi
 DATE_STAMP  = datetime.now().strftime("%Y%m%d")
-OUTPUT_PATH = f"models/qwen3.5-ocr-markup-{DATE_STAMP}"
-CKPT_DIR    = f"models/checkpoints-markup-{DATE_STAMP}"
+# Baasilt treenitud mudel on teine asi kui checkpointist jätkatu – eri nimi,
+# et neid ei saaks kogemata segi ajada ega üksteise peale kirjutada.
+_LIIK       = "markup" if FROM_CHECKPOINT else f"print-base-r{LORA_RANK}"
+OUTPUT_PATH = f"models/qwen3.5-ocr-{_LIIK}-{DATE_STAMP}"
+CKPT_DIR    = f"models/checkpoints-{_LIIK}-{DATE_STAMP}"
 
 print(f"Lähtepunkt:   {BASE_MODEL}")
 print(f"Salvestuskoht: {OUTPUT_PATH}")
@@ -69,7 +100,7 @@ print(f"Salvestuskoht: {OUTPUT_PATH}")
 # Eelkontrollid
 # ---------------------------------------------------------------------------
 
-if not Path(BASE_MODEL).exists():
+if not FROM_CHECKPOINT and "/" not in BASE_MODEL:
     print(f"Viga: checkpoint ei leitud: {BASE_MODEL}")
     print("Käivita esmalt: python scripts/train.py")
     sys.exit(1)
@@ -114,8 +145,23 @@ tokenizer.image_processor.size = {
 print(f"Pildi max_pixels: {MAX_PIXELS:,} px "
       f"→ ~{MAX_PIXELS // 1024} visuaaltokenit")
 
-# Checkpoint sisaldab juba LoRA adaptereid – get_peft_model() EI tohi järgneda
-print("Mudel laaditud etapp 1 checkpoindist (LoRA adapterid juba küljes).")
+if FROM_CHECKPOINT:
+    # Checkpoint sisaldab juba LoRA adaptereid – get_peft_model() EI tohi järgneda
+    print("Mudel laaditud etapp 1 checkpoindist (LoRA adapterid juba küljes).")
+else:
+    model = FastVisionModel.get_peft_model(
+        model,
+        finetune_vision_layers=True,
+        finetune_language_layers=True,
+        finetune_attention_modules=True,
+        finetune_mlp_modules=True,
+        r=LORA_RANK,
+        lora_alpha=LORA_RANK,
+        lora_dropout=0,
+        bias="none",
+        random_state=3407,
+    )
+    print(f"Puhas baasmudel – uued LoRA adapterid lisatud (r={LORA_RANK}).")
 model.print_trainable_parameters()
 
 # ---------------------------------------------------------------------------
@@ -130,6 +176,7 @@ class LehekyljAndmestik:
         self.samples = []
         skipped = 0
         cleaned_m = 0
+        held_out = 0
 
         for src in sources:
             csv_path   = src["csv"]
@@ -155,6 +202,9 @@ class LehekyljAndmestik:
                     if not os.path.exists(img_path):
                         skipped += 1
                         continue
+                    if os.path.basename(row["failinimi"]) in HOLDOUT:
+                        held_out += 1
+                        continue
                     self.samples.append({
                         "failinimi": img_path,
                         "transkriptsioon": t_clean,
@@ -164,6 +214,12 @@ class LehekyljAndmestik:
             print(f"  Hoiatus: {skipped} rida jäeti vahele.")
         if cleaned_m:
             print(f"  Normaliseeritud/puhastatud markup: {cleaned_m} leheküljel.")
+        if held_out:
+            print(f"  Holdout: {held_out} lehte jäeti treeningust välja "
+                  f"({HOLDOUT_PATH}).")
+        elif USE_HOLDOUT and not HOLDOUT:
+            print(f"  HOIATUS: holdout-nimekirja ei ole ({HOLDOUT_PATH}) – "
+                  f"treenitakse kõige peal, hilisem võrdlus ei ole aus.")
 
         print(f"  Andmestik: {len(self.samples)} näidet ({len(sources)} allikast)")
 
@@ -214,14 +270,17 @@ trainer = SFTTrainer(
         max_length=8192,
         per_device_train_batch_size=1,
         gradient_accumulation_steps=4 if TEST_MODE else 8,
-        warmup_steps=2 if TEST_MODE else 10,
+        warmup_steps=2 if TEST_MODE else (30 if FRESH else 10),
         max_steps=5 if TEST_MODE else -1,
         num_train_epochs=1 if TEST_MODE else 2,
-        learning_rate=1e-4,     # inkrementaalne: väiksem LR kui etapp 1 (2e-4)
+        # Checkpointist jätkates on transkriptsioonioskus juba adapteris ja
+        # väike LR hoiab teda alles. Puhtalt baasilt algab adapter nullist –
+        # siis kehtib 1. etapi / Kurrendi retsept: 2e-4 cosine.
+        learning_rate=2e-4 if FRESH else 1e-4,
         logging_steps=1 if TEST_MODE else 10,
         optim="adamw_8bit",
         weight_decay=0.001,
-        lr_scheduler_type="linear",
+        lr_scheduler_type="cosine" if FRESH else "linear",
         seed=3407,
         output_dir=CKPT_DIR,
         report_to="none",

@@ -383,6 +383,23 @@ def strip_italics_in_marginalia(text: str) -> str:
     return _M_BLOCK_RE.sub(lambda mo: "<m>" + _I_TAG_RE.sub("", mo.group(1)) + "</m>", text)
 
 
+#: Poolitusmärk. Juhis (prompt.py) tunneb kahte: `-` (Antiqua) ja `⸗` (Fraktur).
+#: Tegelikkuses on korpustes kolmas: `¬` U+00AC (loogika eituse märk), mida
+#: juhis ei maini. Mõõdetud 27.08.2026: `data/lehekyljed` 8 971 korda (seal
+#: valdav), `data/vutt` 3 989 korda (12 teoses 103-st, seal peaaegu eranditult).
+#: Ehk teose sees järjekindel, teoste vahel vastuolus – transkribeerija harjumus.
+#:
+#: `¬`-teosed on ladinakeelsed disputatsioonid ja Gezelius, ehk Antiqua → `-`.
+#: Ilma selleta näeb mudel sama nähtuse kohta kahte märki, kusjuures kummagi
+#: kasuks otsustab tekstiliik, mitte kirjatüüp. Kasutaja otsus 27.08.2026.
+_SOFT_HYPHEN = "¬"
+
+
+def normalize_hyphenation(text: str) -> str:
+    """`¬` → `-`; juhis tunneb ainult `-` (Antiqua) ja `⸗` (Fraktur)."""
+    return text.replace(_SOFT_HYPHEN, "-")
+
+
 def clean_markup(text: str) -> str:
     """Viib VUTT markup'i treeningu kanoonilisele kujule.
 
@@ -391,7 +408,7 @@ def clean_markup(text: str) -> str:
     kasutavad nii andmestiku ehitaja kui treener, et CSV ja treeningusse
     jõudev tekst oleksid identsed.
     """
-    text = unwrap_tags(text)
+    text = normalize_hyphenation(unwrap_tags(text))
     for _ in range(10):
         cleaned = fix_crossed_tags(text)
         cleaned = normalize_multiline_m_tags(cleaned)
