@@ -452,43 +452,52 @@ kliendipoolele uuesti teha. Iga jooks jätab tingimused faili
 `data/kurrent/eval/<nimi>/run.json` – kiirusnumbrit ei tohi mälu järgi
 tsiteerida.
 
-### Käsikirjapool llama.cpp peale (ette valmistatud, EI OLE aktiveeritud)
+### llama.cpp mõlema mudeli all (aktiveeritud 27.08.2026, katseline)
 
-Mõõdetud 27.08.2026: Kurrendil on llama.cpp **pariteedis** (CER 8,8 % vs
-unslothi 8,7 %, lehe kaupa 19 paremat / 15 halvemat / 35 sama), **4,2x kiirem**
-(4,7 vs 19,6 s/lk) ja võtab **12,7 GB** GPU-d 25,2 asemel. Trükipoolel on
-llama.cpp praegu kasutuskõlbmatu – vt `docs/llamacpp-juurdlus-20260827.md`.
+Mõlemad tüübid käivad nüüd llama.cpp kaudu. Iga mudel vajab OMA serverit:
 
-Kood on valmis, lüliti on `kataloogi-jalgimine-ja-ocr.py`:
+| tüüp | port | mudel |
+|---|---|---|
+| print | 8080 | `markup-20260722-Q8_0.gguf` + `mmproj-markup-20260722-F16.gguf` |
+| hand | 8081 | `kurrent-20260602-Q8_0.gguf` + `mmproj-kurrent-20260602-F16.gguf` |
 
-```python
-ENGINE_CONFIGS = {
-    "print": "unsloth",
-    "hand":  "unsloth",     # <- "llamacpp"
-}
+Mõlemad mahuvad korraga GPU-le: **22,1 GB / 32,6 GB**.
+
+```bash
+sudo cp systemd/llama-server-{print,hand}.service /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable --now llama-server-print llama-server-hand
+curl -s http://127.0.0.1:8080/health && curl -s http://127.0.0.1:8081/health
+sudo systemctl restart ocr-service
 ```
 
-**Enne aktiveerimist tuleb ära teha üks asi** (teine on mõõdetud ja ei blokeeri).
+Teenus kontrollib käivitamisel mõlemat serverit ja keeldub startimast, kui üks
+ei vasta. Lüliti on `ENGINE_CONFIGS` failis `kataloogi-jalgimine-ja-ocr.py`.
 
-1. ~~Mõõda juhise vahe~~ — **MÕÕDETUD 27.08.2026, ei blokeeri.**
-   Teenus saadab käsikirjamudelile `INSTRUCTION`-i, pariteet mõõdeti
-   `KURRENT_INSTRUCTION`-iga. Vahe 69 puhtal holdout-lehel:
+**Mida see maksab – teadlik kompromiss.** Mõõdetud 143 VUTT-i lehel
+(`docs/llamacpp-juurdlus-20260827.md`):
 
-   | juhis | CER puhtad | mediaan | lehe kaupa |
-   |---|---|---|---|
-   | KURRENT_INSTRUCTION | 8,9 % | 6,2 % | — |
-   | INSTRUCTION (teenuses) | 9,0 % | 6,4 % | parem 6 / halvem 14 / sama 50 |
+- Käsikiri: **pariteet** (CER 8,8 % vs unslothi 8,7 %), **4,2x kiirem**
+- Trükk: 135 puhtal lehel **rohkem** marginaale kui vanas teenuses
+  (`<m>` 634 → 684), mediaanlahknevus 3,1 % — **aga 3 lehte 143-st (2,1 %)
+  kaotavad marginaaliveeru täielikult**, põhjus teadmata
 
-   Mõju **0,1 pp**, väiksem kui mootoritevaheline müra. Mehhanism: sidekriips
-   triivib (`¬` 440 → 374, `-` 36 → 72); **XML-märgendust mudel EI tooda**
-   kummagi juhisega (0 tagi mõlemal) — peenhäälestus on promptist tugevam.
+Need 3 lehte on teadlikult sisse võetud, et saada päris kasutuskogemus.
+Kui midagi tundub katki, vaata kõigepealt, kas leht on marginaalirohke.
 
-   Ehk juhise parandamine on **tasuta võit, mitte eeltingimus**. Tee see
-   ERALDI sammuna pärast mootorivahetust: `get_instruction()` tagastagu
-   `hand` puhul `KURRENT_INSTRUCTION`.
+**Tagasi keeramine (kiire):**
+```bash
+# ENGINE_CONFIGS mõlemad -> "unsloth"
+sudo systemctl restart ocr-service
+sudo systemctl disable --now llama-server-print llama-server-hand
+```
 
-2. **Konverteeri REEDESE treeningu mudel**, mitte 20260602. Praegune GGUF on
-   vanast mudelist; uue jaoks:
+**Kaks teadaolevat lahtist otsa:**
+1. Teenus saadab käsikirjamudelile `INSTRUCTION`-i, mitte `KURRENT_INSTRUCTION`-it.
+   Mõõdetud mõju **0,1 pp** – parandus on tasuta võit, aga tehke see ERALDI
+   sammuna, et mootorivahetus jääks ainsaks muutujaks.
+2. Reedese treeningu järel tuleb käsikirjamudel uuesti konverteerida ja
+   `llama-server-hand.service` tee uuendada:
    ```bash
    venv/bin/python scripts/merge_lora.py models/qwen3.5-ocr-kurrent-<uus>
    venv/bin/python ~/Dokumendid/LLM/llama.cpp/convert_hf_to_gguf.py \
@@ -500,30 +509,6 @@ ENGINE_CONFIGS = {
    ~/Dokumendid/LLM/llama.cpp/build/bin/llama-quantize \
        models/gguf/kurrent-<uus>-BF16.gguf models/gguf/kurrent-<uus>-Q8_0.gguf Q8_0 28
    ```
-   ja uuenda teed `systemd/llama-server-hand.service`-is.
-
-**Aktiveerimine:**
-
-```bash
-sudo cp systemd/llama-server-hand.service /etc/systemd/system/
-sudo systemctl daemon-reload
-sudo systemctl enable --now llama-server-hand
-curl -s http://127.0.0.1:8080/health          # {"status":"ok"}
-# siis ENGINE_CONFIGS["hand"] = "llamacpp"
-sudo systemctl restart ocr-service
-```
-
-**GPU mahub napilt.** llama-server hoiab 12,7 GB, unslothi trükimudel batch 4
-juures kuni 25,2 GB – korraga ei mahu. Teenus vabastab seetõttu unslothi mudeli
-iga kord, kui töösse tuleb käsikirjapartii (`ensure_model`), ja laeb selle
-trükipartii ees uuesti. See tähendab **mudeli laadimise viivitust igal
-tüübivahetusel** – segatud järjekorra puhul võib see võidu ära süüa. Kui see
-osutub probleemiks, on lahendus trükipartiide grupeerimine, mitte batch'i
-vähendamine.
-
-**Tagasi keeramine:** `ENGINE_CONFIGS["hand"] = "unsloth"`,
-`sudo systemctl restart ocr-service`, soovi korral
-`sudo systemctl disable --now llama-server-hand`.
 
 ### Aktiveerimine
 

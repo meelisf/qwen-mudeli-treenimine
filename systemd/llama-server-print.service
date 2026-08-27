@@ -1,5 +1,5 @@
 [Unit]
-Description=llama.cpp server – Kurrent (käsikiri) OCR
+Description=llama.cpp server – trüki (markup) OCR
 After=network.target
 Before=ocr-service.service
 
@@ -16,11 +16,11 @@ WorkingDirectory=/home/mf/Dokumendid/LLM/qwen3.5
 # -c 65536 jaguneb slottide vahel: -np 4 annab 16384 tokenit slotile.
 # Leht vajab ~5000 visuaal + kuni 4096 väljund.
 ExecStart=/home/mf/Dokumendid/LLM/llama.cpp/build/bin/llama-server \
-    -m /home/mf/Dokumendid/LLM/qwen3.5/models/gguf/kurrent-20260602-Q8_0.gguf \
-    --mmproj /home/mf/Dokumendid/LLM/qwen3.5/models/gguf/mmproj-kurrent-20260602-F16.gguf \
+    -m /home/mf/Dokumendid/LLM/qwen3.5/models/gguf/markup-20260722-Q8_0.gguf \
+    --mmproj /home/mf/Dokumendid/LLM/qwen3.5/models/gguf/mmproj-markup-20260722-F16.gguf \
     --image-max-tokens 5000 \
     -ngl 99 -c 65536 -np 4 -cb -fa on \
-    --host 127.0.0.1 --port 8081
+    --host 127.0.0.1 --port 8080
 Restart=on-failure
 RestartSec=10
 

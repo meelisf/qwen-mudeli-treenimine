@@ -99,12 +99,16 @@ MODEL_CONFIGS = {
 #: käima ENNE teenuse käivitamist ja GPU-l ei ole ruumi mõlemale mootorile
 #: korraga – seetõttu vabastatakse unslothi mudel HTTP-tüübi ajaks.
 ENGINE_CONFIGS = {
-    "print": "unsloth",
-    "hand":  "unsloth",     # <- "llamacpp" aktiveerimiseks
+    "print": "llamacpp",
+    "hand":  "llamacpp",
 }
 
-#: llama-serveri aadress (kasutatakse ainult ENGINE_CONFIGS väärtusel "llamacpp")
-LLAMACPP_ENDPOINT = "http://127.0.0.1:8080"
+#: Iga mudel vajab OMA serverit – üks llama-server hoiab ühte mudelit.
+#: Mõlemad mahuvad korraga GPU-le (~12,5 GB kumbki, RTX 5090 32,6 GB).
+LLAMACPP_ENDPOINTS = {
+    "print": "http://127.0.0.1:8080",
+    "hand":  "http://127.0.0.1:8081",
+}
 LLAMACPP_TIMEOUT = 900
 
 BATCH_SIZE = 4
@@ -149,32 +153,32 @@ logger.info(f"Baaskaust: {BASE_OCR_KAUST}")
 logger.info(f"Mudelid: {MODEL_CONFIGS}")
 logger.info(f"Mootorid: {ENGINE_CONFIGS}")
 
-if "llamacpp" in ENGINE_CONFIGS.values():
+for _mt, _eng in ENGINE_CONFIGS.items():
+    if _eng != "llamacpp":
+        continue
+    _ep = LLAMACPP_ENDPOINTS[_mt]
     # Server peab käima ENNE teenust ja tema pildieelarve peab vastama meie
     # omale. llama.cpp vaikepiir on 4096 visuaaltokenit, meil 5 120 000/1024 =
     # 5000; ilma --image-max-tokens 5000-ta kärbitakse pilt VAIKSELT ja peen
     # kiri kaob (docs/llamacpp-juurdlus-20260827.md, Põhjus 1).
     import json as _json, urllib.request as _url
     try:
-        with _url.urlopen(f"{LLAMACPP_ENDPOINT}/health", timeout=10) as _r:
+        with _url.urlopen(f"{_ep}/health", timeout=10) as _r:
             _r.read()
-    except Exception as _e:
-        logger.error(f"llama-server ei vasta ({LLAMACPP_ENDPOINT}): {_e}")
-        logger.error("Käivita see enne teenust – vt SPIKKER.md.")
-        sys.exit(1)
-    try:
         _keha = _json.dumps({"model": "x", "max_tokens": 1, "temperature": 0,
                              "messages": [{"role": "user", "content": "x"}]}).encode()
-        _req = _url.Request(f"{LLAMACPP_ENDPOINT}/v1/chat/completions", data=_keha,
+        _req = _url.Request(f"{_ep}/v1/chat/completions", data=_keha,
                             headers={"Content-Type": "application/json"})
         with _url.urlopen(_req, timeout=60) as _r:
             _json.loads(_r.read())
-        logger.info(f"llama-server vastab: {LLAMACPP_ENDPOINT}")
-        logger.warning("KONTROLLI KÄSITSI, et server on käivitatud lipuga "
-                       "--image-max-tokens 5000 – vaikepiir 4096 kärbib pildi vaikselt.")
+        logger.info(f"llama-server [{_mt}] vastab: {_ep}")
     except Exception as _e:
-        logger.error(f"llama-server ei vastanud testpäringule: {_e}")
+        logger.error(f"llama-server [{_mt}] ei vasta ({_ep}): {_e}")
+        logger.error("Käivita mõlemad serverid enne teenust – vt SPIKKER.md.")
         sys.exit(1)
+if "llamacpp" in ENGINE_CONFIGS.values():
+    logger.warning("KONTROLLI, et serverid on käivitatud lipuga "
+                   "--image-max-tokens 5000 – vaikepiir 4096 kärbib pildi vaikselt.")
 logger.info(f"Logi fail: {LOG_FILE}")
 
 if not torch.cuda.is_available():
@@ -571,7 +575,7 @@ def process_batch_http(batch_items, model_type):
             "chat_template_kwargs": {"enable_thinking": False},
         }).encode("utf-8")
         req = urllib.request.Request(
-            f"{LLAMACPP_ENDPOINT}/v1/chat/completions", data=keha,
+            f"{LLAMACPP_ENDPOINTS[model_type]}/v1/chat/completions", data=keha,
             headers={"Content-Type": "application/json"})
         try:
             with urllib.request.urlopen(req, timeout=LLAMACPP_TIMEOUT) as r:
