@@ -137,9 +137,20 @@ edasi treenida. Kaks teed:
       --base=models/merged/qwen3.5-ocr-lora-backup-20260527-bf16 --lora-rank=64
   ```
   Siis kannab adapter ainult märgendust, transkriptsioon on kaaludes sees.
-  **NB!** `train_markup.py` peab siis `get_peft_model()` KUTSUMA (merged
-  mudelil adaptereid küljes ei ole) — praegu ta seda tingimuslikult ei tee,
-  see tuleb üle vaadata.
+
+  **KOODIMUUDATUS ON VAJALIK, enne kui see käsk töötab.** `train_markup.py`-l
+  ei ole `--lora-rank` lippu ega `get_peft_model()` kutset üldse — ta OSKAB
+  ainult olemasolevat adapterit edasi treenida. `train_kurrent.py`-s on
+  täpselt õige muster juba olemas ja sealt saab selle üle tuua:
+
+  | mida | `train_kurrent.py` |
+  |---|---|
+  | `LORA_RANK` konstant + `--lora-rank=` lipp | read 57, 65–66, 72 |
+  | tingimuslik `get_peft_model()` HF-baasi puhul | read 74, 129–139 |
+
+  Töö on väike (~20 rida), aga seda ei tohi teha „muuseas" — see muudab
+  `train_markup.py` käitumist ka tavajooksul, seega tuleb tingimus kirjutada
+  nii, et olemasolev ahel (checkpointist edasi) käitub täpselt nagu praegu.
 
 ### Aga ilma holdout'ita ei saa seda mõõta
 
