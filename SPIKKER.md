@@ -393,7 +393,8 @@ kordades suurem, on midagi valesti:
 venv/bin/python scripts/eval_kurrent.py models/qwen3.5-ocr-kurrent-YYYYMMDD
 ```
 
-73 holdout-lehte, batch 4, ~25 min. Võrdle vana mudeli baseline'iga
+73 holdout-lehte, batch 4, **23,9 min** (19,6 s/lk, 183 lehte/tunnis;
+mõõdetud 27.08.2026 voolupiiril 450 W). Võrdle vana mudeli baseline'iga
 (26.08.2026, `data/kurrent/eval/qwen3.5-ocr-kurrent-20260602/results.csv`):
 
 | | CER | mediaan | loope |
@@ -414,6 +415,42 @@ CER mõõdab vastavust arhiivikorpuse tavadele, mitte VUTT-i kasulikkust.
 Otsust ei tee ainult numbri põhjal – lase paar päris lehte re-OCR-i läbi ja
 vaata silmaga. Tühja lehe käitumist saab kontrollida ilma GT-ta: võta
 VUTT-ist märgendamata tühi versopool ja vaata, kas tuleb `[tühi lehekülg]`.
+
+### Sama holdout llama.cpp GGUF-i peal
+
+Kui tahad mõõta, kas kitsaskoht on mudel või mootor, käib sama holdout ka
+llama.cpp serveri kaudu. Pane server käima eraldi tmux-i aknasse (ocr-service
+peatatud):
+
+```bash
+~/Dokumendid/LLM/llama.cpp/build/bin/llama-server \
+    -m models/gguf/kurrent-20260602-Q8_0.gguf \
+    --mmproj models/gguf/mmproj-kurrent-20260602-F16.gguf \
+    -ngl 99 -c 65536 -np 4 -cb -fa on --host 127.0.0.1 --port 8080
+
+venv/bin/python scripts/eval_kurrent.py \
+    --endpoint http://127.0.0.1:8080 kurrent-20260602-Q8_0
+```
+
+**`-c` on kokku kõigi slottide peale**, ehk `-np 4 -c 65536` annab 16384
+tokenit slotile. Leht vajab ~4000 visuaaltokenit + kuni 4096 väljundit, seega
+`-c 32768` (8192/slot) jääks napiks. GGUF-i tegemine: [[llamacpp-gguf]] mälus,
+skript `scripts/merge_lora.py` → `convert_hf_to_gguf.py --no-nextn`.
+
+Mõõdetud 27.08.2026, sama 73 lehte, mõlemad 450 W juures:
+
+| | 73 lk | s/lk | lehte/tunnis | GPU | CER (69 lk, ilma loopideta) |
+|---|---|---|---|---|---|
+| unsloth bf16, batch 4 | 23,9 min | 19,6 | 183 | 25,2 GB | 8,7 % |
+| llama.cpp Q8_0, `-np 4` | 4,2 min | 3,5 | 1031 | 12,7 GB | 9,1 % |
+
+**5,6x kiirem, täpsus sama.** Aga: llama.cpp serveril **ei ole
+`LoopStopper`-it** (VUTT #227 custom `StoppingCriteria`), ja loopi läks teine
+leht kui unslothil – koond-CER 13,9 % → 15,6 % tuli tervenisti sellest ühest
+lehest. Enne kui llama.cpp teenusesse läheb, tuleb kordusloopi tuvastus
+kliendipoolele uuesti teha. Iga jooks jätab tingimused faili
+`data/kurrent/eval/<nimi>/run.json` – kiirusnumbrit ei tohi mälu järgi
+tsiteerida.
 
 ### Aktiveerimine
 
