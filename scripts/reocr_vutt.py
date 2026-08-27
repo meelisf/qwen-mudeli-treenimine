@@ -59,6 +59,11 @@ LIMIT    = None
 BATCH    = 4
 MAX_NEW_TOKENS = 4096
 RESUME   = "--resume" in sys.argv
+#: Pildi ja teksti järjekord promptis. Mõõdetud 27.08.2026: pilt ENNE teksti
+#: annab peene ääretekstiga lehtedel oluliselt parema tulemuse (0017: 11 vs 0
+#: marginaali). llama-cli teeb sedasama (mtmd-cli.cpp:452 lisab pildimarkeri
+#: prompti ETTE) – see, mitte mtmd eeltöötlus, seletab CLI-server erinevuse.
+IMAGE_FIRST = "--image-first" in sys.argv
 STATS    = "--stats" in sys.argv
 
 args = sys.argv[1:]
@@ -146,6 +151,7 @@ if LIMIT:
 out_dir = OUT_ROOT / OUT_NAME
 out_dir.mkdir(parents=True, exist_ok=True)
 print(f"Server:  {ENDPOINT}  (paralleelseid: {BATCH})")
+print(f"Järjekord: {'PILT enne teksti' if IMAGE_FIRST else 'tekst enne pilti'}")
 print(f"Väljund: {out_dir}\n")
 
 try:
@@ -195,10 +201,13 @@ def pildi_data_uri(path: Path) -> str:
 def saada(img: Path):
     keha = json.dumps({
         "model": "vutt",
-        "messages": [{"role": "user", "content": [
-            {"type": "text", "text": PROMPT},
-            {"type": "image_url", "image_url": {"url": pildi_data_uri(img)}},
-        ]}],
+        "messages": [{"role": "user", "content": (
+            [{"type": "image_url", "image_url": {"url": pildi_data_uri(img)}},
+             {"type": "text", "text": PROMPT}]
+            if IMAGE_FIRST else
+            [{"type": "text", "text": PROMPT},
+             {"type": "image_url", "image_url": {"url": pildi_data_uri(img)}}]
+        )}],
         "max_tokens": MAX_NEW_TOKENS,
         "temperature": 0,
         "chat_template_kwargs": {"enable_thinking": False},

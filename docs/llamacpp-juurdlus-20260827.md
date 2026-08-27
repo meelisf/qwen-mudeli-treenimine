@@ -359,74 +359,89 @@ mõlema teksti teedega: `data/vutt/reocr/markup-Q8_0-png/SILMAGA-VAADATA.md`.
 
 ---
 
-## Jääkpõhjus leitud: llama.cpp serveerimisraja regressioon
+## Jääkprobleem: mitte teravus, aga põhjus on endiselt teadmata
 
-**See EI OLE teravusprobleem.** Tõestatud otsemõõtmisega lehel `1635_1_0036`:
+> **Parandus.** Selle peatüki esimene versioon väitis, et põhjus on
+> llama.cpp serveerimisraja regressioon (issue #22785 / PR #21031). **See
+> diagnoos ei pea paika** – vt „Miks CLI-võrdlus oli halb sond" allpool.
+> Kehtima jääb ainult see, mis on otse mõõdetud.
 
-| mida serverile anti | pildi mõõt | `<m>` |
+### Mis on tõestatud: EI OLE teravusprobleem
+
+Otsemõõtmine lehel `1635_1_0036`:
+
+| serverile antud | mõõt | `<m>` |
 |---|---|---|
 | terve leht | 2560×1952 | **0** |
 | **ainult marginaaliveerg, TÄPSELT sama pikslitihedus** | 672×1952 | **24** |
 | ainult veerg, originaaltihedus (1,21× rohkem px) | 800×2368 | 25 |
 
-Sama mootor, sama server, sama eeltöötlus, **sama arv piksleid glüüfi kohta**.
-Lõigatud veerg annab 24 marginaali, terve leht null. Kui pikslitihedus hoida
-samana, loeb llama.cpp neid tähti probleemideta.
+Sama mootor, server, eeltöötlus ja **sama arv piksleid glüüfi kohta**.
+llama.cpp SUUDAB neid glüüfe eristada; ta kaotab need ainult siis, kui veerg
+on terve lehe osa. See tulemus seisab.
 
-**llama.cpp issue #22785** kirjeldab sedasama: Qwen3.5 / `PROJECTOR_TYPE_QWEN3VL`,
-peene detaili kadu `llama-server`-is alates buildist b8545, **`llama-cli` sama
-buildiga töötab õigesti**, tokenite arv mõlemal identne. Bisectitud PR-i #21031
-(`mtmd: refactor image preprocessing`, uus `mtmd_image_preprocessor_dyn_size`)
-juurde; kahtlus on patch'ide järjekorral või grid/mRoPE 2D positsiooni-ID-de
-nihkel. Issue on suletud „not planned".
+**Mida see välistab:**
+- **Suurem pildieelarve ei aita** – sama resolutsioon töötab, kui veerg on
+  eraldi. See vähendab `docs/plaan-trukipool-jargmine-treening.md` punkti 1
+  kaalu: eelarve tõstmine ei ole marginaalide lahendus, ainult varu küsimus.
+- **Treening ega uus baasmudel ei ole ilmselge lahendus** – unsloth saab samast
+  pildist samade kaaludega marginaalid kätte, ehk mudel oskab. Aga NB: kuna
+  põhjus on teadmata, ei saa ka kindlalt öelda, et treening EI aitaks.
 
-Kontrollisin CLI-vs-server ka ise, b10641, sama pilt ja mudel:
+### Miks CLI-võrdlus oli halb sond
 
-| leht | CLI | server (think) | server (no-think) |
-|---|---|---|---|
-| 0017 | **11** `<m>` | 0 | 0 |
-| 0058 | **3** `<cs>` | 0 | 0 |
-| 0034 | 5 `<cs>` | 0 | **15** `<cs>` |
+`llama-cli` leidis lehel `0017` 11 marginaali seal, kus `llama-server` andis 0 —
+see paistis kinnitavat issue #22785 „server ≠ CLI" mustrit. **Tegelik põhjus on
+proosalisem:** `tools/mtmd/mtmd-cli.cpp:452` lisab pildimarkeri prompti **ETTE**,
+meie serveripäringutes oli pilt teksti **JÄREL**. Server pildiga-ees taastab
+CLI tulemuse lehe pealt täpselt (0017: 11 = 11, 0034: 5 = 5) ja lööb ta kohati
+üle. Ehk CLI-l ei olnud eelist, tal oli teine prompt.
 
-CLI ≠ server ka siis, kui mõtlemine on mõlemal sees. CLI ei ole siiski ühtlaselt
-parem (0034) ega tootmiskõlblik (laadib mudeli iga käivitusega uuesti).
+Ja **pildi ette panemine EI OLE parandus** – 135 puhta lehe peal:
 
-### Mida see välistab
+| järjekord | lahkn. mediaan | `<m>` | `<i>` | `<cs>` | marg. kadus | loope |
+|---|---|---|---|---|---|---|
+| **tekst enne (praegune, nagu treeningus)** | **3,1 %** | **684** | **1192** | 57 | **3** | 5 |
+| pilt enne (nagu CLI) | 7,3 % | 643 | 1135 | **81** | 6 | 4 |
+| VUTT (teenus) | — | 634 | 1120 | 131 |
 
-- **Treening ei aita.** Treenida saab ainult transformersi eeltöötluse vastu;
-  kui serveerimispool annab patch'id teisiti, ei muuda rohkem treeningut miski.
-- **Uus baasmudel ei aita.** Sama põhjus – viga ei ole mudelis.
-- **Suurem pildieelarve ei aita.** Mõõdetud: sama resolutsioon töötab, kui veerg
-  on eraldi. See muudab ka `docs/plaan-trukipool-jargmine-treening.md` punkti 1
-  kaalu – eelarve tõstmine ei ole enam marginaalide lahendus, vaid ainult varu
-  küsimus.
+Järjekord on lihtsalt järjekordne noatera-hoob, nagu kvantimine, filter ja
+sampler enne teda: aitab mõnel lehel, kahjustab mujal. Ainus koht, kus
+pilt-enne võidab, on `<cs>` (81 vs 57) – ehk seegi lahtine vahe on
+promptijärjekorra suhtes tundlik.
+
+**Metoodiline õppetund:** sümptomi kinnitamine ei ole põhjuse kinnitamine.
+Issue'st võeti kaasa ka seletus ja kontrolliti ainult sümptomit; kui oleks
+kohe koodi vaadatud, oleks `mtmd-cli.cpp:452` tulnud välja tunde varem. Ja
+neljal käsitsi valitud raskel lehel häälestamine andis vastupidise vastuse kui
+143-leheline korpus.
+
+### Mis jääb: 3 lehte 143-st, põhjus teadmata
+
+unsloth saab samalt pildilt samade kaaludega marginaalid kätte, llama.cpp ei
+saa. Välistatud on kaalud, liitmine, mmproj, kvantimine, resample-filter,
+tokenieelarve, chat template, promptijärjekord ja teravus. **Järgmine sond on
+visuaalenkoodri vahe-embeddingute otsevõrdlus** transformersi ja llama.cpp
+vahel – see on ainus koht, kuhu pole veel vaadatud.
+
+**Ülesvoolu me praegu midagi ei saada:** meil ei ole tõestatud viga, ainult
+tõestatud erinevus. Issue #22785 alla tasub siiski kirjutada, et CLI-server
+vahe seletub promptijärjekorraga – reporter otsib tõenäoliselt samast valest
+kohast.
 
 ### Kurrent ei ole immuunne, ainult vähem tabatud
 
-Esialgne oletus „Kurrendis marginaale ei ole, regressioon ei puuduta" oli
-**vale** – käsikirjades on äärekommentaare, kuupäevi ja märksõnu. Mõõdetud
-69 puhtal holdout-lehel:
-
-| | |
-|---|---|
-| väljundi pikkuse vahe (llama.cpp − unsloth) | mediaan **+0 märki**, 66/69 lehel ±20 sees |
-| unslothi ridu, mida llama.cpp väljundis ei ole | **12** |
-| **nende mediaanpikkus** | **9 märki** |
-| säilinud ridade mediaanpikkus | 36 märki |
-| lühikesi (<15 märki) kaotatute seas | **58 %** |
-| lühikesi säilinute seas | **9 %** |
-
-Kokku ei kaota llama.cpp Kurrendil midagi, aga **kaotatud read on
-süstemaatiliselt lühikesed** – lühikesi on kaotatute seas 6× üleesindatud.
-Sama muster, väiksem maht (~0,1 % sisust, CER-is ei paista). **Patch aitaks
-mõlemat materjalitüüpi**, mitte ainult trükipoolt.
+Esialgne oletus „Kurrendis marginaale ei ole, probleem ei puuduta" oli **vale**.
+Mõõdetud 69 puhtal holdout-lehel: väljundi pikkus sama (mediaan +0), aga
+12 unslothi rida puudub llama.cpp väljundist ja **nende mediaanpikkus on
+9 märki** vs säilinute 36; lühikesi (<15) on kaotatute seas 58 %, säilinute
+seas 9 %. Sama muster, ~0,1 % sisust, CER-is ei paista.
 
 ### Mida see maksab
 
-143 lehest kaotab marginaalid täielikult **3 (2,1 %)**, loopib 5 (3,5 %).
-Ülejäänud 134 lehel annab llama.cpp ROHKEM marginaale kui praegune teenus
-(634 → 684). Ehk regressioon on kitsas, aga tabab täpselt seda, mille pärast
-markup-treening tehti.
+143 lehest kaotab marginaalid täielikult **3 (2,1 %)**. Ülejäänud 135 lehel
+annab llama.cpp ROHKEM marginaale kui praegune teenus (634 → 684) ja
+mediaanlahknevus on 3,1 %.
 
 ### Kõrvalleid: mõtlemisrežiim on selle peenhäälestuse jaoks kasutu
 
@@ -438,17 +453,17 @@ Kontrollitud 8 lehel, sama server, ainult `enable_thinking` erineb:
 | `enable_thinking: true` | **23** | **0 märki** | **4096 igal lehel** |
 
 `<think>` plokk jääb tühjaks ja mudel põletab sellegipoolest kõik 4096 tokenit.
-Põhjus: `train_markup.py` treenis iga näite `enable_thinking=False`-ga, ehk
-mõtlemine on jaotusest väljas. Mõtlemiseelarve ei ole siin lahendus.
+`train_markup.py` treenis iga näite `enable_thinking=False`-ga, ehk mõtlemine
+on jaotusest väljas. Mõtlemiseelarve ei ole siin lahendus.
 
 ---
 
 ## Mis on lahtine
 
-1. ~~Kaks lehte kaheksast kaotavad marginaalid~~ — **LAHENDATUD** (vt eespool):
-   llama.cpp serveerimisraja regressioon, issue #22785 / PR #21031. Ei ole
-   teravus, ei ole meie mudel, ei ole meie eeltöötlus. Lahtiseks jääb ainult
-   see, kas keegi selle ülesvoolu või lokaalselt ära parandab.
+1. **3 lehte 143-st kaotavad marginaalid.** Teravus on välistatud (lõikekatse),
+   samuti kaalud, kvantimine, filter, tokenieelarve ja promptijärjekord.
+   Põhjus on **teadmata**; järgmine sond oleks visuaalenkoodri
+   vahe-embeddingute võrdlus transformersi ja llama.cpp vahel.
 2. **`<cs>` jääb poole peale** (131 → 60) ja seda ei muutnud ükski pildiparandus.
    Seni uurimata.
 3. **Kumb pool marginaalides õigem on** — vajab silmaga kontrolli, vt nimekiri.
