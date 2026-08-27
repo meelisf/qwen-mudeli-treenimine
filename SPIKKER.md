@@ -468,18 +468,24 @@ ENGINE_CONFIGS = {
 }
 ```
 
-**Enne aktiveerimist tuleb ära teha kaks asja.**
+**Enne aktiveerimist tuleb ära teha üks asi** (teine on mõõdetud ja ei blokeeri).
 
-1. **Mõõda juhise vahe.** Teenus saadab käsikirjamudelile `INSTRUCTION`-i,
-   mitte `KURRENT_INSTRUCTION`-it, aga kogu pariteedimõõtmine tehti
-   KURRENT_INSTRUCTION-iga. Ehk mõõdetud konfiguratsioon EI OLE see, mida
-   teenus kasutab:
+1. ~~Mõõda juhise vahe~~ — **MÕÕDETUD 27.08.2026, ei blokeeri.**
+   Teenus saadab käsikirjamudelile `INSTRUCTION`-i, pariteet mõõdeti
+   `KURRENT_INSTRUCTION`-iga. Vahe 69 puhtal holdout-lehel:
 
-   ```bash
-   venv/bin/python scripts/eval_kurrent.py --prompt print models/qwen3.5-ocr-kurrent-<kuupäev>
-   ```
-   Võrdle vaikimisi jooksuga. Kui vahe on suur, tuleb `get_instruction()`
-   parandada – aga eraldi sammuna, mitte koos mootorivahetusega.
+   | juhis | CER puhtad | mediaan | lehe kaupa |
+   |---|---|---|---|
+   | KURRENT_INSTRUCTION | 8,9 % | 6,2 % | — |
+   | INSTRUCTION (teenuses) | 9,0 % | 6,4 % | parem 6 / halvem 14 / sama 50 |
+
+   Mõju **0,1 pp**, väiksem kui mootoritevaheline müra. Mehhanism: sidekriips
+   triivib (`¬` 440 → 374, `-` 36 → 72); **XML-märgendust mudel EI tooda**
+   kummagi juhisega (0 tagi mõlemal) — peenhäälestus on promptist tugevam.
+
+   Ehk juhise parandamine on **tasuta võit, mitte eeltingimus**. Tee see
+   ERALDI sammuna pärast mootorivahetust: `get_instruction()` tagastagu
+   `hand` puhul `KURRENT_INSTRUCTION`.
 
 2. **Konverteeri REEDESE treeningu mudel**, mitte 20260602. Praegune GGUF on
    vanast mudelist; uue jaoks:
