@@ -6,7 +6,13 @@ see on esimene järjekorras ja unslothi/transformersit ei tohi enne liigutada.
 
 ---
 
-## 1. Pildieelarve — kõige olulisem, ja kõige rohkem takistusi
+## 1. Pildieelarve — kaal LANGES 27.08.2026 õhtul
+
+> **Parandus.** Lõikekatse näitas, et sama marginaaliveerg **täpselt samas
+> pikslitiheduses** loeb eraldi pildina korrektselt (24 marginaali), terve lehe
+> osana 0. Ehk teravus EI OLE piirang ja **eelarve tõstmine ei ole marginaalide
+> lahendus** — ainult varu küsimus. Allolev analüüs jääb alles varu
+> hindamiseks, aga see ei ole enam kõige olulisem punkt; selleks on 1b.
 
 ### Mida me nüüd teame
 
@@ -86,6 +92,67 @@ paarikümne minuti.
 | loeb | ükskõik | **Tükelda leht** — odav, `max_seq_length` ei muutu, andmestikku ei pea ümber ehitama |
 | ei loe | paraneb | Tõsta eelarvet 6 Mpx-ni (`max_seq_length` 8947, 21 % lehti puudutab) — väikseim samm, mis midagi annab |
 | ei loe | halveneb | Resolutsioon ei ole ainus probleem; vaata treeningandmete küljendusjaotust (punkt 2) |
+
+---
+
+## 1b. LoRA maht ja kaheastmeline ahel — uus punkt (27.08.2026 õhtul)
+
+### Asümmeetria on päris
+
+| mudel | LoRA | treenitavaid | samme | loss lõpus | lähtepunkt |
+|---|---|---|---|---|---|
+| **trükk** 20260722 | r=16, α=16 | **51,0 M** | **268** | 0,036 | **eeltreenitud** (1500 lk transkriptsioon) |
+| **Kurrent** 20260602 | r=64, α=64 | **203,9 M** | 3178 | 0,108 | puhas baas `unsloth/Qwen3.5-9B` |
+
+Trükimudel teeb **raskemat** ülesannet — transkriptsioon *pluss* VUTT XML
+märgendus — **neljandiku parameetritega** ja 12× väiksema sammuarvuga.
+
+### Kaks asja, mis seda võrdlust nüansseerivad
+
+**(1) Lossi ei saa otse võrrelda.** Trükk alustab soojalt: 1. etapi
+transkriptsioonioskus on juba adapteris. Kurrent alustab külmalt. Trüki
+loss 0,036 ei tõesta, et maht on piisav — ta tõestab, et mudel oskas juba
+enne alustamist neid dokumente lugeda. (Selle vea tegin esimeses analüüsis.)
+
+**(2) See r=16 adapter kannab KAHTE asja korraga.** `train_markup.py` laadib
+`models/qwen3.5-ocr-lora-backup-20260527` ja treenib **sedasama adapterit
+edasi** (`get_peft_model()` EI tohi järgneda). Ehk 51 M parameetrit hoiavad
+nii 1. etapi transkriptsiooni kui märgendust; Kurrendi 204 M hoiavad ühte
+asja. See on tugevam mahuargument kui pelk r=16 vs r=64.
+
+### Tehniline takistus ja selle lahendus
+
+**r-i ei saa olemasoleval adapteril tõsta.** r=16 adapterit ei saa r=64-na
+edasi treenida. Kaks teed:
+
+- **(a)** Treeni puhtast baasist r=64-ga korraga transkriptsioon + märgendus.
+  Vajab mõlemat andmestikku ja on pikk jooks.
+- **(b)** **Liida 1. etapi adapter baasi ja alusta värske r=64 adapteriga
+  märgenduse peal.** See on nüüd võimalik, sest `scripts/merge_lora.py`
+  sai täna valmis (GGUF-i jaoks, aga sobib täpselt siia):
+
+  ```bash
+  venv/bin/python scripts/merge_lora.py models/qwen3.5-ocr-lora-backup-20260527
+  venv/bin/python scripts/train_markup.py \
+      --base=models/merged/qwen3.5-ocr-lora-backup-20260527-bf16 --lora-rank=64
+  ```
+  Siis kannab adapter ainult märgendust, transkriptsioon on kaaludes sees.
+  **NB!** `train_markup.py` peab siis `get_peft_model()` KUTSUMA (merged
+  mudelil adaptereid küljes ei ole) — praegu ta seda tingimuslikult ei tee,
+  see tuleb üle vaadata.
+
+### Aga ilma holdout'ita ei saa seda mõõta
+
+Trüki-holdout'i ei ole, ehk r=16 vs r=64 võrdlust ei saaks tõestada — teeksime
+kalli jooksu ja vaataksime tulemust silmaga, nagu täna. Ja andmenappus on
+sõltumatu probleem: **Menii on treeningus 0 lehte**, ≥30 marginaaliga lehti on
+41 ja ≥39 marginaaliga **3**, samas kui katkised lehed on 24–39 vahemikus.
+Mudel on seda otsust näinud kolm korda.
+
+**Järjekord:** (1) 10-leheline holdout, (2) 20–30 Menii-tüüpi lehte
+märgendatud, (3) alles siis r=16 vs r=64 kontrollitud võrdlusena tee (b) kaudu.
+Mitte sellepärast, et maht oleks vale hüpotees, vaid sellepärast, et ilma
+esimese kaheta ei saa tulemust tõestada.
 
 ---
 
