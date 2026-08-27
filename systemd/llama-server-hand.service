@@ -1,0 +1,28 @@
+[Unit]
+Description=llama.cpp server – Kurrent (käsikiri) OCR
+After=network.target
+Before=ocr-service.service
+
+[Service]
+Type=simple
+User=mf
+WorkingDirectory=/home/mf/Dokumendid/LLM/qwen3.5
+# --image-max-tokens 5000 ON KOHUSTUSLIK.
+# llama.cpp vaikepiir on 4096 visuaaltokenit, meie pildieelarve on
+# 5 120 000 px / 1024 = 5000. Ilma selleta skaleeritakse pilt VAIKSELT
+# väiksemaks ja peen kiri kaob – logisse rida ei jää.
+# Vt docs/llamacpp-juurdlus-20260827.md, Põhjus 1.
+#
+# -c 65536 jaguneb slottide vahel: -np 4 annab 16384 tokenit slotile.
+# Leht vajab ~5000 visuaal + kuni 4096 väljund.
+ExecStart=/home/mf/Dokumendid/LLM/llama.cpp/build/bin/llama-server \
+    -m /home/mf/Dokumendid/LLM/qwen3.5/models/gguf/kurrent-20260602-Q8_0.gguf \
+    --mmproj /home/mf/Dokumendid/LLM/qwen3.5/models/gguf/mmproj-kurrent-20260602-F16.gguf \
+    --image-max-tokens 5000 \
+    -ngl 99 -c 65536 -np 4 -cb -fa on \
+    --host 127.0.0.1 --port 8080
+Restart=on-failure
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target

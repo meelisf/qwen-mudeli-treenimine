@@ -34,7 +34,8 @@ from unsloth import FastVisionModel
 from natsort import natsorted
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "scripts"))
 from prompt import INSTRUCTION
-from imaging import MAX_PIXELS
+from imaging import MAX_PIXELS, fit_to_grid
+from loop_detect import is_looped
 
 # --- 0. LOGIMINE JA SIGNAALID ---
 
@@ -85,6 +86,27 @@ MODEL_CONFIGS = {
     "hand":  "models/qwen3.5-ocr-kurrent-20260602",
 }
 
+#: Mootor tüübi kaupa: "unsloth" (kohapeal GPU-l) või "llamacpp" (HTTP server).
+#:
+#: llama.cpp on Kurrendil mõõdetult PARITEEDIS ja 4,2x kiirem (CER 8,8 % vs
+#: 8,7 %, GPU 12,7 vs 25,2 GB) – vt docs/llamacpp-juurdlus-20260827.md.
+#: Trükipoolel on ta praegu KASUTUSKÕLBMATU: llama-server kaotab peene
+#: ääreveeru (issue #22785 / PR #21031 regressioon, EI OLE resolutsiooni-
+#: probleem). Kurrent on samast veast puudutatud ainult marginaalselt
+#: (12 lühikest rida 69 lehe peale, ~0,1 % sisust).
+#:
+#: AKTIVEERIMINE: vt SPIKKER.md "Käsikirjapool llama.cpp peale". Server peab
+#: käima ENNE teenuse käivitamist ja GPU-l ei ole ruumi mõlemale mootorile
+#: korraga – seetõttu vabastatakse unslothi mudel HTTP-tüübi ajaks.
+ENGINE_CONFIGS = {
+    "print": "unsloth",
+    "hand":  "unsloth",     # <- "llamacpp" aktiveerimiseks
+}
+
+#: llama-serveri aadress (kasutatakse ainult ENGINE_CONFIGS väärtusel "llamacpp")
+LLAMACPP_ENDPOINT = "http://127.0.0.1:8080"
+LLAMACPP_TIMEOUT = 900
+
 BATCH_SIZE = 4
 
 PDF_DPI = 300
@@ -125,6 +147,34 @@ EXTENSIONS = {".jpg", ".jpeg", ".png", ".bmp", ".tif", ".tiff"}
 logger.info("=== Käivitan In-Place OCR Teenuse (Qwen3.5-9B) ===")
 logger.info(f"Baaskaust: {BASE_OCR_KAUST}")
 logger.info(f"Mudelid: {MODEL_CONFIGS}")
+logger.info(f"Mootorid: {ENGINE_CONFIGS}")
+
+if "llamacpp" in ENGINE_CONFIGS.values():
+    # Server peab käima ENNE teenust ja tema pildieelarve peab vastama meie
+    # omale. llama.cpp vaikepiir on 4096 visuaaltokenit, meil 5 120 000/1024 =
+    # 5000; ilma --image-max-tokens 5000-ta kärbitakse pilt VAIKSELT ja peen
+    # kiri kaob (docs/llamacpp-juurdlus-20260827.md, Põhjus 1).
+    import json as _json, urllib.request as _url
+    try:
+        with _url.urlopen(f"{LLAMACPP_ENDPOINT}/health", timeout=10) as _r:
+            _r.read()
+    except Exception as _e:
+        logger.error(f"llama-server ei vasta ({LLAMACPP_ENDPOINT}): {_e}")
+        logger.error("Käivita see enne teenust – vt SPIKKER.md.")
+        sys.exit(1)
+    try:
+        _keha = _json.dumps({"model": "x", "max_tokens": 1, "temperature": 0,
+                             "messages": [{"role": "user", "content": "x"}]}).encode()
+        _req = _url.Request(f"{LLAMACPP_ENDPOINT}/v1/chat/completions", data=_keha,
+                            headers={"Content-Type": "application/json"})
+        with _url.urlopen(_req, timeout=60) as _r:
+            _json.loads(_r.read())
+        logger.info(f"llama-server vastab: {LLAMACPP_ENDPOINT}")
+        logger.warning("KONTROLLI KÄSITSI, et server on käivitatud lipuga "
+                       "--image-max-tokens 5000 – vaikepiir 4096 kärbib pildi vaikselt.")
+    except Exception as _e:
+        logger.error(f"llama-server ei vastanud testpäringule: {_e}")
+        sys.exit(1)
 logger.info(f"Logi fail: {LOG_FILE}")
 
 if not torch.cuda.is_available():
@@ -153,8 +203,24 @@ def _setup_tokenizer(tok):
 
 
 def ensure_model(model_type: str):
-    """Laadib mudeli kui pole laetud või tüüp on muutunud."""
+    """Laadib mudeli kui pole laetud või tüüp on muutunud.
+
+    HTTP-mootoriga tüübi puhul mudelit ei laeta ja seni laetud unslothi mudel
+    VABASTATAKSE: llama-server hoiab ise ~12,7 GB ja mõlemale korraga GPU-l
+    ruumi ei ole.
+    """
     global _current_model_type, model, tokenizer
+
+    if ENGINE_CONFIGS.get(model_type) == "llamacpp":
+        if model is not None:
+            logger.info(f"Vabastan unslothi mudeli ({_current_model_type}) – "
+                        f"{model_type} kasutab llama-serverit")
+            model = None
+            tokenizer = None
+            _current_model_type = None
+            gc.collect()
+            torch.cuda.empty_cache()
+        return
 
     if _current_model_type == model_type:
         return
@@ -188,6 +254,24 @@ def ensure_model(model_type: str):
     logger.info(f"Mudel '{model_type}' laetud.")
 
 # --- 3. ABIFUNKTSIOONID ---
+
+def get_instruction(model_type: str) -> str:
+    """Juhis materjalitüübi kaupa.
+
+    HOIATUS – teadaolev lahknevus, mida EI TOHI koos mootorivahetusega parandada:
+    teenus on algusest saati saatnud MÕLEMALE tüübile `INSTRUCTION`-i, kuigi
+    käsikirjamudel on treenitud `KURRENT_INSTRUCTION`-iga. Kogu Kurrendi
+    pariteedimõõtmine (docs/llamacpp-juurdlus-20260827.md) tehti seevastu
+    KURRENT_INSTRUCTION-iga, ehk mõõdetud konfiguratsioon ei ole see, mida
+    teenus praegu kasutab.
+
+    Siin hoitakse tahtlikult PRAEGUST käitumist, et mootorivahetus jääks ainsaks
+    muutujaks. Vahe tuleb enne juhise parandamist ära mõõta:
+        venv/bin/python scripts/eval_kurrent.py --prompt print <mudel>
+    ja võrrelda vaikimisi (kurrent) jooksuga.
+    """
+    return INSTRUCTION
+
 
 def get_chat_template():
     return tokenizer.apply_chat_template(
@@ -438,6 +522,93 @@ def write_err_marker(txt_path, exc, kategooria):
         logger.error("Ei suutnud .err märgendit kirjutada {}: {}".format(err_path, e))
 
 
+def process_batch_http(batch_items, model_type):
+    """Sama töö llama-serveri kaudu. Sama .err semantika mis unslothi rajal.
+
+    Kolm asja, mis on mõõdetud ja mida ei tohi tagasi keerata
+    (docs/llamacpp-juurdlus-20260827.md):
+
+    1. **`imaging.fit_to_grid()`** – pilt viiakse täpselt sellele patch-võrele,
+       mida Qwen3.5 protsessor valiks. llama.cpp ümardab ise, aga ilma
+       antialiasinguta, ja see hävitab õhukesed tähed.
+    2. **PNG, mitte JPEG** – lähtefail on juba JPEG; teine põlvkond sööb
+       peene kirja ära.
+    3. Server vajab **`--image-max-tokens 5000`**; vaikepiir on 4096 ja pilt
+       kärbitakse vaikselt. Seda kontrollitakse käivitamisel.
+
+    Loopi ei saa siin genereerimise ajal peatada (serveri API ei paku
+    `StoppingCriteria`-t), seega tuvastatakse ta valminud väljundist
+    `loop_detect.is_looped()`-iga – mõõdetult sama hea.
+    """
+    if not batch_items:
+        return
+
+    import base64, io, json, urllib.request
+    from concurrent.futures import ThreadPoolExecutor
+
+    def uks(item):
+        img_path, txt_path = item
+        try:
+            with PILImage.open(img_path) as im:
+                pilt = fit_to_grid(im.convert("RGB"))
+            buf = io.BytesIO()
+            pilt.save(buf, "PNG", optimize=False)
+        except Exception as e:
+            logger.error(f"Viga pildi avamisel {img_path}: {e}")
+            write_err_marker(txt_path, e, KAT_PILT)
+            return None
+        uri = "data:image/png;base64," + base64.b64encode(buf.getvalue()).decode()
+        keha = json.dumps({
+            "model": model_type,
+            "messages": [{"role": "user", "content": [
+                {"type": "text", "text": get_instruction(model_type)},
+                {"type": "image_url", "image_url": {"url": uri}},
+            ]}],
+            "max_tokens": 4096,
+            "temperature": 0,
+            # Mõtlemine on selle peenhäälestuse jaoks jaotusest väljas: mõõdetult
+            # jääb <think> tühjaks ja mudel põletab kõik 4096 tokenit.
+            "chat_template_kwargs": {"enable_thinking": False},
+        }).encode("utf-8")
+        req = urllib.request.Request(
+            f"{LLAMACPP_ENDPOINT}/v1/chat/completions", data=keha,
+            headers={"Content-Type": "application/json"})
+        try:
+            with urllib.request.urlopen(req, timeout=LLAMACPP_TIMEOUT) as r:
+                vastus = json.loads(r.read())
+            return txt_path, strip_output(vastus["choices"][0]["message"]["content"])
+        except Exception as e:
+            logger.exception(f"llama-server päring ebaõnnestus {img_path}: {e}")
+            write_err_marker(txt_path, e, KAT_MUDEL)
+            return None
+
+    with ThreadPoolExecutor(max_workers=BATCH_SIZE) as pool:
+        tulemused = list(pool.map(uks, batch_items))
+
+    for t in tulemused:
+        if t is None:
+            continue
+        txt_out_path, clean_text = t
+        leid = is_looped(clean_text)
+        if leid:
+            periood, kordused = leid
+            write_err_marker(txt_out_path, KordusLoop(
+                "periood {} sõna, {} kordust — tuvastatud valminud väljundist".format(
+                    periood, kordused)), KAT_MUDEL)
+            continue
+        if not clean_text.strip():
+            logger.warning(f"Tühi väljund: {os.path.basename(txt_out_path)} — "
+                           f"mudel ei genereerinud teksti")
+        try:
+            with open(txt_out_path, "w", encoding="utf-8") as f:
+                f.write(clean_text)
+        except Exception as e:
+            logger.error(f"Ei suutnud kirjutada {txt_out_path}: {e}")
+            write_err_marker(txt_out_path, e, KAT_KIRJUTUS)
+            continue
+        logger.info(f"Transkribeeritud: {os.path.basename(txt_out_path)}")
+
+
 def process_batch(batch_items):
     """
     Töötleb ühe batchi pilte.
@@ -581,7 +752,10 @@ def main_loop():
                         break
                     batch = tasks[i:i + BATCH_SIZE]
                     logger.info(f"[{mt}] Töötlen {i+1}–{min(i+BATCH_SIZE, len(tasks))} / {len(tasks)}")
-                    process_batch(batch)
+                    if ENGINE_CONFIGS.get(mt) == "llamacpp":
+                        process_batch_http(batch, mt)
+                    else:
+                        process_batch(batch)
                     gc.collect()
             logger.info("Kõik hetke tööd tehtud. Ootan uusi...")
             last_heartbeat = time.time()

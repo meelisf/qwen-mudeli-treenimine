@@ -9,8 +9,7 @@ Juurdlus 27.08.2026. llama.cpp b10641 (539f24529), RTX 5090 @ 450 W.
 
 Mudel viidi llama.cpp peale, et inferents kiiremaks saada. Kurrendi
 käsikirjadel läks kõik hästi. Trükilehtedel kadus kaheksal leheküljel *terve
-marginaaliveerg* — ja kaalud olid bitipealt õiged. Kaks põhjust, mõlemad
-seadistuses; üks neist meie enda kliendis.
+marginaaliveerg* (7 puhtas võrdluses + loopinud `0025`) — ja kaalud olid bitipealt õiged. Kaks põhjust, mõlemad inferentsiahelas; üks neist meie enda kliendis.
 
 ---
 
@@ -147,7 +146,7 @@ Selles juurdluses on **kaks erinevat 4096-piiri** ja neid on lihtne segi ajada:
 
 | | mis see on | mõju |
 |---|---|---|
-| **sisendi 4096** | `clip.cpp` visuaaltokenite lagi | pilt kärbitakse vaikselt → Põhjus 1 |
+| **sisendi 4096** | `clip.cpp` visuaaltokenite lagi | pilt skaleeritakse vaikselt väiksemaks → peen detail kaob (Põhjus 1) |
 | **väljundi 4096** | meie `max_tokens` genereerimisel | leht võib jääda pooleli |
 
 Väljundi lakke jooksis puhtas jooksus **6 lehte 143-st (4 %)**, JPEG-jooksus
@@ -249,8 +248,9 @@ clip.vision.image_min_pixels    EI LEIDU
 clip.vision.image_max_pixels    EI LEIDU
 ```
 
-Sama 15-võtmeline `clip.*` komplekt mis meil — sama konverteritee. **Unsloth
-Studio ei ole seda lahendanud.** Ehk meil ei ole valmis retsepti, aga on
+Sama 15-võtmeline `clip.*` komplekt mis meil — sama konverteritee. **Unslothi ametlik GGUF-eksport ei sisalda
+neid võtmeid.** (Kas Studio kasutab täpselt sedasama rada, ei ole eraldi
+kontrollitud – aga avalik eksport on sama 15-võtmelise komplektiga.) Ehk meil ei ole valmis retsepti, aga on
 konkreetne veakirjeldus ülesvoolu: iga Qwen3-VL / Qwen3.5 GGUF selle teega on
 4096 tokeni peal, kui kasutaja lippu ei tea.
 
@@ -359,12 +359,96 @@ mõlema teksti teedega: `data/vutt/reocr/markup-Q8_0-png/SILMAGA-VAADATA.md`.
 
 ---
 
+## Jääkpõhjus leitud: llama.cpp serveerimisraja regressioon
+
+**See EI OLE teravusprobleem.** Tõestatud otsemõõtmisega lehel `1635_1_0036`:
+
+| mida serverile anti | pildi mõõt | `<m>` |
+|---|---|---|
+| terve leht | 2560×1952 | **0** |
+| **ainult marginaaliveerg, TÄPSELT sama pikslitihedus** | 672×1952 | **24** |
+| ainult veerg, originaaltihedus (1,21× rohkem px) | 800×2368 | 25 |
+
+Sama mootor, sama server, sama eeltöötlus, **sama arv piksleid glüüfi kohta**.
+Lõigatud veerg annab 24 marginaali, terve leht null. Kui pikslitihedus hoida
+samana, loeb llama.cpp neid tähti probleemideta.
+
+**llama.cpp issue #22785** kirjeldab sedasama: Qwen3.5 / `PROJECTOR_TYPE_QWEN3VL`,
+peene detaili kadu `llama-server`-is alates buildist b8545, **`llama-cli` sama
+buildiga töötab õigesti**, tokenite arv mõlemal identne. Bisectitud PR-i #21031
+(`mtmd: refactor image preprocessing`, uus `mtmd_image_preprocessor_dyn_size`)
+juurde; kahtlus on patch'ide järjekorral või grid/mRoPE 2D positsiooni-ID-de
+nihkel. Issue on suletud „not planned".
+
+Kontrollisin CLI-vs-server ka ise, b10641, sama pilt ja mudel:
+
+| leht | CLI | server (think) | server (no-think) |
+|---|---|---|---|
+| 0017 | **11** `<m>` | 0 | 0 |
+| 0058 | **3** `<cs>` | 0 | 0 |
+| 0034 | 5 `<cs>` | 0 | **15** `<cs>` |
+
+CLI ≠ server ka siis, kui mõtlemine on mõlemal sees. CLI ei ole siiski ühtlaselt
+parem (0034) ega tootmiskõlblik (laadib mudeli iga käivitusega uuesti).
+
+### Mida see välistab
+
+- **Treening ei aita.** Treenida saab ainult transformersi eeltöötluse vastu;
+  kui serveerimispool annab patch'id teisiti, ei muuda rohkem treeningut miski.
+- **Uus baasmudel ei aita.** Sama põhjus – viga ei ole mudelis.
+- **Suurem pildieelarve ei aita.** Mõõdetud: sama resolutsioon töötab, kui veerg
+  on eraldi. See muudab ka `docs/plaan-trukipool-jargmine-treening.md` punkti 1
+  kaalu – eelarve tõstmine ei ole enam marginaalide lahendus, vaid ainult varu
+  küsimus.
+
+### Kurrent ei ole immuunne, ainult vähem tabatud
+
+Esialgne oletus „Kurrendis marginaale ei ole, regressioon ei puuduta" oli
+**vale** – käsikirjades on äärekommentaare, kuupäevi ja märksõnu. Mõõdetud
+69 puhtal holdout-lehel:
+
+| | |
+|---|---|
+| väljundi pikkuse vahe (llama.cpp − unsloth) | mediaan **+0 märki**, 66/69 lehel ±20 sees |
+| unslothi ridu, mida llama.cpp väljundis ei ole | **12** |
+| **nende mediaanpikkus** | **9 märki** |
+| säilinud ridade mediaanpikkus | 36 märki |
+| lühikesi (<15 märki) kaotatute seas | **58 %** |
+| lühikesi säilinute seas | **9 %** |
+
+Kokku ei kaota llama.cpp Kurrendil midagi, aga **kaotatud read on
+süstemaatiliselt lühikesed** – lühikesi on kaotatute seas 6× üleesindatud.
+Sama muster, väiksem maht (~0,1 % sisust, CER-is ei paista). **Patch aitaks
+mõlemat materjalitüüpi**, mitte ainult trükipoolt.
+
+### Mida see maksab
+
+143 lehest kaotab marginaalid täielikult **3 (2,1 %)**, loopib 5 (3,5 %).
+Ülejäänud 134 lehel annab llama.cpp ROHKEM marginaale kui praegune teenus
+(634 → 684). Ehk regressioon on kitsas, aga tabab täpselt seda, mille pärast
+markup-treening tehti.
+
+### Kõrvalleid: mõtlemisrežiim on selle peenhäälestuse jaoks kasutu
+
+Kontrollitud 8 lehel, sama server, ainult `enable_thinking` erineb:
+
+| | `<m>` kokku | `<think>` sisu | väljundtokeneid |
+|---|---|---|---|
+| `enable_thinking: false` | **446** | — | 900–1400 |
+| `enable_thinking: true` | **23** | **0 märki** | **4096 igal lehel** |
+
+`<think>` plokk jääb tühjaks ja mudel põletab sellegipoolest kõik 4096 tokenit.
+Põhjus: `train_markup.py` treenis iga näite `enable_thinking=False`-ga, ehk
+mõtlemine on jaotusest väljas. Mõtlemiseelarve ei ole siin lahendus.
+
+---
+
 ## Mis on lahtine
 
-1. **Kaks lehte kaheksast** (`0017`, `0036`) kaotavad marginaalid ka lõpliku
-   ahelaga. Kvantimine on välistatud (BF16 = Q8_0), pildiahel on välistatud.
-   Järgmine samm oleks visuaalenkoodri vahe-embeddingute otsevõrdlus
-   transformersi ja llama.cpp vahel, mitte enam samplerid ega pilditöötlus.
+1. ~~Kaks lehte kaheksast kaotavad marginaalid~~ — **LAHENDATUD** (vt eespool):
+   llama.cpp serveerimisraja regressioon, issue #22785 / PR #21031. Ei ole
+   teravus, ei ole meie mudel, ei ole meie eeltöötlus. Lahtiseks jääb ainult
+   see, kas keegi selle ülesvoolu või lokaalselt ära parandab.
 2. **`<cs>` jääb poole peale** (131 → 60) ja seda ei muutnud ükski pildiparandus.
    Seni uurimata.
 3. **Kumb pool marginaalides õigem on** — vajab silmaga kontrolli, vt nimekiri.

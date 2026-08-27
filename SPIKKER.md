@@ -452,6 +452,73 @@ kliendipoolele uuesti teha. Iga jooks jätab tingimused faili
 `data/kurrent/eval/<nimi>/run.json` – kiirusnumbrit ei tohi mälu järgi
 tsiteerida.
 
+### Käsikirjapool llama.cpp peale (ette valmistatud, EI OLE aktiveeritud)
+
+Mõõdetud 27.08.2026: Kurrendil on llama.cpp **pariteedis** (CER 8,8 % vs
+unslothi 8,7 %, lehe kaupa 19 paremat / 15 halvemat / 35 sama), **4,2x kiirem**
+(4,7 vs 19,6 s/lk) ja võtab **12,7 GB** GPU-d 25,2 asemel. Trükipoolel on
+llama.cpp praegu kasutuskõlbmatu – vt `docs/llamacpp-juurdlus-20260827.md`.
+
+Kood on valmis, lüliti on `kataloogi-jalgimine-ja-ocr.py`:
+
+```python
+ENGINE_CONFIGS = {
+    "print": "unsloth",
+    "hand":  "unsloth",     # <- "llamacpp"
+}
+```
+
+**Enne aktiveerimist tuleb ära teha kaks asja.**
+
+1. **Mõõda juhise vahe.** Teenus saadab käsikirjamudelile `INSTRUCTION`-i,
+   mitte `KURRENT_INSTRUCTION`-it, aga kogu pariteedimõõtmine tehti
+   KURRENT_INSTRUCTION-iga. Ehk mõõdetud konfiguratsioon EI OLE see, mida
+   teenus kasutab:
+
+   ```bash
+   venv/bin/python scripts/eval_kurrent.py --prompt print models/qwen3.5-ocr-kurrent-<kuupäev>
+   ```
+   Võrdle vaikimisi jooksuga. Kui vahe on suur, tuleb `get_instruction()`
+   parandada – aga eraldi sammuna, mitte koos mootorivahetusega.
+
+2. **Konverteeri REEDESE treeningu mudel**, mitte 20260602. Praegune GGUF on
+   vanast mudelist; uue jaoks:
+   ```bash
+   venv/bin/python scripts/merge_lora.py models/qwen3.5-ocr-kurrent-<uus>
+   venv/bin/python ~/Dokumendid/LLM/llama.cpp/convert_hf_to_gguf.py \
+       models/merged/qwen3.5-ocr-kurrent-<uus>-bf16 --outtype bf16 --no-nextn \
+       --outfile models/gguf/kurrent-<uus>-BF16.gguf
+   venv/bin/python ~/Dokumendid/LLM/llama.cpp/convert_hf_to_gguf.py \
+       models/merged/qwen3.5-ocr-kurrent-<uus>-bf16 --mmproj --outtype f16 \
+       --outfile models/gguf/mmproj-kurrent-<uus>-F16.gguf
+   ~/Dokumendid/LLM/llama.cpp/build/bin/llama-quantize \
+       models/gguf/kurrent-<uus>-BF16.gguf models/gguf/kurrent-<uus>-Q8_0.gguf Q8_0 28
+   ```
+   ja uuenda teed `systemd/llama-server-hand.service`-is.
+
+**Aktiveerimine:**
+
+```bash
+sudo cp systemd/llama-server-hand.service /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable --now llama-server-hand
+curl -s http://127.0.0.1:8080/health          # {"status":"ok"}
+# siis ENGINE_CONFIGS["hand"] = "llamacpp"
+sudo systemctl restart ocr-service
+```
+
+**GPU mahub napilt.** llama-server hoiab 12,7 GB, unslothi trükimudel batch 4
+juures kuni 25,2 GB – korraga ei mahu. Teenus vabastab seetõttu unslothi mudeli
+iga kord, kui töösse tuleb käsikirjapartii (`ensure_model`), ja laeb selle
+trükipartii ees uuesti. See tähendab **mudeli laadimise viivitust igal
+tüübivahetusel** – segatud järjekorra puhul võib see võidu ära süüa. Kui see
+osutub probleemiks, on lahendus trükipartiide grupeerimine, mitte batch'i
+vähendamine.
+
+**Tagasi keeramine:** `ENGINE_CONFIGS["hand"] = "unsloth"`,
+`sudo systemctl restart ocr-service`, soovi korral
+`sudo systemctl disable --now llama-server-hand`.
+
 ### Aktiveerimine
 
 Käsikirjamudel elab `kataloogi-jalgimine-ja-ocr.py` failis:
