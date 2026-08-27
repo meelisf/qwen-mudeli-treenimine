@@ -43,3 +43,4 @@ outputs*/
 
 # Eval-väljundid (mudelite tekstid, taastekitatavad)
 data/kurrent/eval/
+data/vutt/reocr/
