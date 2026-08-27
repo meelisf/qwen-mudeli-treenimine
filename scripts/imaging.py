@@ -42,7 +42,8 @@ JPEG_QUALITY = 92
 JPEG_SUBSAMPLING = 2
 
 
-def fit_to_budget(im: Image.Image, budget: int = MAX_PIXELS) -> Image.Image:
+def fit_to_budget(im: Image.Image, budget: int = MAX_PIXELS,
+                  resample: int = Image.LANCZOS) -> Image.Image:
     """Skaleerib pildi eelarve piiresse. AINUS koht, kus geomeetria määratakse.
 
     KRIITILINE: seda peab kasutama nii treeningandmete ettevalmistamisel kui
@@ -53,12 +54,16 @@ def fit_to_budget(im: Image.Image, budget: int = MAX_PIXELS) -> Image.Image:
     ehk filtri valik EI ole tühine detail.
 
     Väiksemaid pilte ei suurendata: eelarve on lagi, mitte sihtmärk.
+
+    `resample` on olemas AINULT selleks, et seda nihet saaks mõõta
+    (`eval_kurrent.py --resample bicubic` jäljendab image processori enda
+    skaleerimist). Andmestiku ettevalmistuses jäta see puutumata.
     """
     w, h = im.size
     if w * h <= budget:
         return im
     scale = (budget / (w * h)) ** 0.5
-    return im.resize((max(1, int(w * scale)), max(1, int(h * scale))), Image.LANCZOS)
+    return im.resize((max(1, int(w * scale)), max(1, int(h * scale))), resample)
 
 
 def needs_resize(path: Path, budget: int = MAX_PIXELS) -> bool:
@@ -96,3 +101,54 @@ def prepare_image(src: Path, dst: Path, budget: int = MAX_PIXELS) -> str:
             subsampling=JPEG_SUBSAMPLING, optimize=True,
         )
     return "resized"
+
+
+#: Patch-võre samm: patch_size 16 x spatial_merge_size 2. Qwen3.5 protsessor
+#: ümardab pildi mõlema külje selle kordseks.
+GRID_FACTOR = 32
+
+
+#: Alumine pikslipiir – protsessori `shortest_edge`. Väiksem pilt suurendatakse.
+MIN_PIXELS = 65536
+
+
+def fit_to_grid(im: Image.Image, budget: int = MAX_PIXELS,
+                factor: int = GRID_FACTOR,
+                resample: int = Image.LANCZOS,
+                floor: int = MIN_PIXELS) -> Image.Image:
+    """Skaleerib pildi TÄPSELT sellele võrele, mida Qwen3.5 protsessor valiks.
+
+    Sama aritmeetika mis HF `smart_resize` (Qwen2VL image processor): mõlemad
+    küljed ümardatakse `factor`-i kordseks ja kui tulemus ületab eelarve,
+    tõmmatakse alla ja ümardatakse allapoole.
+
+    MILLEKS: llama.cpp teeb sedasama ümardamist ise, aga **ilma
+    antialiasinguta** (`image_resize_pad = PAD_CEIL`, ülesvoolu PR #17577
+    parandas selle ainult LFM2-VL-ile). Väike allaskaleerimine ilma
+    antialiasinguta hävitab õhukesed kaldkirjatähed – mõõdetud 27.08.2026:
+    marginaaliveerg kadus tervetel lehtedel. Kui klient annab pildi juba
+    õigel võrel, ei ole llama.cpp-l midagi skaleerida.
+
+    NB! Saada tulemus PNG-na, mitte JPEG-ina. Lähtefail on juba JPEG ja teine
+    JPEG-põlvkond sööb needsamad õhukesed tähed ära (mõõdetud: `<m>` tage 76
+    JPEG-iga vs 150 PNG-ga samal 8 lehel).
+    """
+    import math
+
+    w, h = im.size
+    w_bar = max(factor, round(w / factor) * factor)
+    h_bar = max(factor, round(h / factor) * factor)
+    if w_bar * h_bar > budget:
+        beta = (w * h / budget) ** 0.5
+        w_bar = max(factor, int(w / beta / factor) * factor)
+        h_bar = max(factor, int(h / beta / factor) * factor)
+    elif w_bar * h_bar < floor:
+        # Alumine piir: protsessor suurendab liiga väikese pildi üles. Meie
+        # skaneeringud siia ei satu, aga ilma selleta lahkneb funktsioon
+        # protsessorist (mõõdetud: 4 juhtu 1120-st, kõik alla 130 px küljega).
+        beta = (floor / (w * h)) ** 0.5
+        w_bar = max(factor, math.ceil(w * beta / factor) * factor)
+        h_bar = max(factor, math.ceil(h * beta / factor) * factor)
+    if (w_bar, h_bar) == (w, h):
+        return im
+    return im.resize((w_bar, h_bar), resample)
