@@ -57,7 +57,6 @@ GREEK = re.compile(r"[Ͱ-Ͽἀ-῿]")
 GREEK_RUN = re.compile(r"([Ͱ-Ͽἀ-῿]+)")
 LATIN = re.compile(r"[A-Za-zÀ-ÿſ]")
 WORD = re.compile(r"[A-Za-zÀ-ÿſͰ-Ͽἀ-῿]+")
-TRIM = re.compile(r"^(\W*)(.*?)(\W*)$", re.S)
 PAGE_NR = re.compile(r"^(\d+)_Gezelius_" + TEOS)
 
 
@@ -74,9 +73,68 @@ def fix_homoglyphs(text: str) -> str:
     return WORD.sub(one, text)
 
 
+#: Ladina täht, sh see, mis meie enda paranduse järel tekib.
+_LAT = "A-Za-zÀ-ÿſæœÆŒ"
+
+#: Sõnad, kus `ae`/`oe` EI ole ligatuur. Kontrollitud originaalpildilt:
+#: `coerceri` (lk 0155) on trükitud lahku, sest co-+arceo ei ole diftong;
+#: `Israelitarum` (lk 0252) samuti. Kõik ülejäänud kontrollitud juhud
+#: (cœtus lk 0026, proœmium lk 0283, Ægypti lk 0303, GRÆCO lk 0005) on
+#: ligatuuriga, ka suurtähtedes.
+NO_LIGATURE = re.compile(r"^(coerc|Israel)", re.I)
+
+_LIGATURES = [("ae", "æ"), ("oe", "œ"), ("Ae", "Æ"), ("AE", "Æ"),
+              ("Oe", "Œ"), ("OE", "Œ")]
+
+
+def fix_ligatures(text: str) -> str:
+    """`ae`/`oe` → `æ`/`œ` puhtladina sõnades (ka suurtähtedes)."""
+    def one(mo):
+        w = mo.group(0)
+        if GREEK.search(w) or NO_LIGATURE.match(w):
+            return w
+        for a, b in _LIGATURES:
+            w = w.replace(a, b)
+        return w
+    return WORD.sub(one, text)
+
+
+#: Sõna, mille sees `s` on pikk. `¬` (reamurre) EI lõpeta sõna – „omis¬ / si"
+#: keskel olev s on ikka pikk.
+_S_WORD = re.compile(f"[{_LAT}]+¬?")
+
+
+def fix_long_s(text: str) -> str:
+    """`s` → `ſ` sõna alguses ja keskel; sõna lõpus jääb `s`.
+
+    Antiikvakursiivi konventsioon, mille originaal järgib läbivalt:
+    ſylveſtris, poſſeſſio, aſſentatio. Suurtähelist `S`-i see ei puuduta.
+    """
+    def one(mo):
+        w = mo.group(0)
+        if GREEK.search(w):
+            return w
+        # Viimane täht jääb lühikeseks – v.a kui sõna murdub reavahetusel
+        # (lk 0014 „omiſ¬ / ſi"), sest siis ei ole see sõna lõpp.
+        keep = -1 if w.endswith("¬") else len(w) - 1
+        return "".join("ſ" if c == "s" and i != keep else c
+                       for i, c in enumerate(w))
+    return _S_WORD.sub(one, text)
+
+
 def _is_running_head(line: str) -> bool:
-    """Lehepäis: lühike rida numbriga, nt „ΚΝ ΚΟ   193"."""
-    return len(line) < 40 and bool(re.search(r"\d", line))
+    """Lehepäis: lühike rida numbriga, nt „ΚΝ ΚΟ   193".
+
+    Osal lehtedel on leheküljenumber servast maha lõigatud või lugemata
+    (lk 0195 „KA", 0416 „XE", 0021 „AB ΑΓ") – siis tunneme päise ära selle
+    järgi, et rida koosneb ainult tähestikumarkeritest.
+    """
+    line = line.strip()
+    if not line or len(line) >= 40:
+        return False
+    if re.search(r"\d", line):
+        return True
+    return bool(re.fullmatch(r"[A-ZΆ-Ϋἀ-῿ ]{2,12}", line))
 
 
 #: Lehepäises on kreeka tähestikumarkerid (ΒΛ, ΕΓ, ΚΛ, ΜΗ, ΣΑ, ΦΑ). Osa neist
@@ -106,22 +164,53 @@ PSEUDO_RANGE = (21, 440)
 #: Rida, mis koosneb ainult üksikust suurtähest (+ number/kirjavahemärk).
 _SIGNATURE = re.compile(r"\s*[A-Z]\s*[\d.,)]*\s*")
 
+#: Ladina sõna. `à` etümoloogiaviites („(à θέω)") on trükis püstkirjas, seega
+#: ei loe seda kursiivilõigu sisuks – ilma selle erandita venib kursiiv üle
+#: sulu kreeka sõnani.
+_LATIN_WORD = re.compile(f"[{_LAT}]+")
+_NOT_CONTENT = {"à"}
+
+#: Kirjavahemärgid, mis kuuluvad kursiivi sisse: lause lõpupunkt ja
+#: reamurde `¬`. Avasulg tõmmatakse sisse eraldi, vasakult.
+_TAIL = re.compile(r"[.,;:!?¬)]+")
+
+
+def _italic_span(seg: str):
+    """(algus, lõpp) kursiiviga kaetavast osast, või None kui pole sisu.
+
+    Piirid on võetud kasutaja käsitsi parandatud lehelt (VUTT lk 176 =
+    `gezelius-lexicon-0180`): lõpupunkt ja `¬` jäävad `<i>` SISSE, avasulg
+    samuti (`<i>(arbor quædam odora,) thya.</i>`), aga kreeka ees seisev
+    etümoloogiasaba jääb välja (`<i>damnum: mulcta:</i> (à θέω)`).
+    """
+    words = [m for m in _LATIN_WORD.finditer(seg)
+             if m.group(0) not in _NOT_CONTENT]
+    if not words:
+        return None
+    a, b = words[0].start(), words[-1].end()
+    if a and seg[a - 1] == "(":
+        a -= 1
+    m = _TAIL.match(seg, b)
+    return a, m.end() if m else b
+
 
 def pseudo_markup(text: str) -> str:
     """Märgib kreeka lõikude vahelised ladinatähelised lõigud `<i>`-ga.
 
     SÜNTEETILINE. Vt mooduli docstring'ut. Lehepäis jäetakse vahele.
     """
+    read = text.split("\n")
+    viimased = len(read) - 3  # poogna signatuur seisab lehe jalal
     out = []
-    for idx, line in enumerate(text.split("\n")):
+    for idx, line in enumerate(read):
         if idx == 0 and _is_running_head(line):
             out.append(line)
             continue
         if _SIGNATURE.fullmatch(line):
-            # Poogna signatuur lehe jalal (A, B, C, D… iga 16 lehe järel) või
-            # üksik sektsioonitäht. Trükis on need püstkirjas, mitte kursiivis.
-            # Ilma selle erandita märgiti neid 39 tükki valesti.
-            out.append(line)
+            # Poogna signatuur lehe jalal (A, B, C… iga 16 lehe järel) on
+            # trükis KURSIIVIS – vt lk 0125 „G 5". Sama mustriga rida lehe
+            # ülaosas on aga sektsioonitäht (lk 0021 „A"), mis on püstkirjas.
+            out.append(f"<i>{line.strip()}</i>" if idx >= viimased else line)
             continue
         parts = []
         for seg in GREEK_RUN.split(line):
@@ -130,8 +219,12 @@ def pseudo_markup(text: str) -> str:
             if GREEK.match(seg) or not LATIN.search(seg):
                 parts.append(seg)
                 continue
-            pre, core, post = TRIM.match(seg).groups()
-            parts.append(f"{pre}<i>{core}</i>{post}" if core else seg)
+            span = _italic_span(seg)
+            if span is None:
+                parts.append(seg)
+                continue
+            a, b = span
+            parts.append(f"{seg[:a]}<i>{seg[a:b]}</i>{seg[b:]}")
         out.append("".join(parts))
     return "\n".join(out)
 
@@ -153,7 +246,7 @@ def kirjuta(out_dir: Path, markup: bool, pildid: bool):
     n_markup = 0
     for nr, pilt, tekst in lk:
         base = f"gezelius-lexicon-{nr:04d}"
-        tekst = fix_homoglyphs(tekst)
+        tekst = fix_long_s(fix_ligatures(fix_homoglyphs(tekst)))
         read = tekst.split("\n")
         if read and _is_running_head(read[0]):
             read[0] = fix_running_head(read[0])
@@ -186,12 +279,17 @@ def stats():
                 gr += 1
                 if any(c.isascii() and c.isalpha() for c in w):
                     mixed += 1
-    spans = sum(len(re.findall(r"<i>", pseudo_markup(fix_homoglyphs(t))))
-                for _, _, t in lk)
+    puhas = [fix_long_s(fix_ligatures(fix_homoglyphs(t))) for _, _, t in lk]
+    spans = sum(len(re.findall(r"<i>", pseudo_markup(t))) for t in puhas)
+    lig = sum(t.count("æ") + t.count("œ") + t.count("Æ") + t.count("Œ")
+              for t in puhas)
+    longs = sum(t.count("ſ") for t in puhas)
     print(f"Lexiconi lehti:              {len(lk)}")
     print(f"kreekat sisaldavaid sõnu:    {gr}")
     print(f"  homoglüüfidega:            {mixed}  ({100*mixed/gr:.1f} %)")
     print(f"pseudomärgendus annaks:      {spans} <i> spani ({spans/len(lk):.0f} lehe kohta)")
+    print(f"ligatuure (æ/œ):             {lig}")
+    print(f"pikka s-i (ſ):               {longs}")
 
 
 def valideeri(kasitsi: Path, pseudo: Path):

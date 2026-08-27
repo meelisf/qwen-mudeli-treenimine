@@ -292,10 +292,60 @@ sisaldava sõna sees) parandas 1 472 sõna, aga ei näinud sõnu, mis on
 
 **Ja reegel andis kohe ühe õppetunni sünteetilise GT kohta.** Esimene versioon
 märgendas 39 üksikut suurtähte lehe jalal (`<i>A</i>`, `<i>B</i>`, `<i>C</i>`,
-`<i>D</i>`, iga 16 lehe järel) — need on **poogna signatuurid**, trükis
-püstkirjas. Kreekas ei ole C-d ega D-d, ehk vea sai tagantjärele ära tunda;
-aga ilma selleta oleks 39 vale spani läinud treeningusse iseendaga täiesti
-kooskõlas. Täpselt see, mille eest allpool hoiatatakse. Parandatud, jäi 0.
+`<i>D</i>`, iga 16 lehe järel) — need on **poogna signatuurid**. Need arvati
+esialgu püstkirjas olevat ja jäeti märkimata.
+
+**Parandus 27.08 õhtul: see oletus oli vale.** Originaalpildil (lk 0125 „*G 5*")
+on signatuur **kursiivis**, koos numbriga. Nüüd märgitakse ta tervikuna
+(`<i>G 5</i>`) — 108 lehel. Erand jäi alles ühes kohas: sama mustriga rida
+lehe **ülaosas** ei ole signatuur, vaid sektsioonitäht (lk 0021 „A"), ja see
+on tõesti püstkirjas. Piir käib selle järgi, kas rida on lehe kolme viimase
+sees. Õppetund kehtib edasi, ainult teistpidi: **sünteetilise reegli iga
+oletust tuleb pildilt kontrollida, ka siis kui ta on usutav.**
+
+### 0c-5. Transkriptsioonistiil (27.08, kasutaja märkus)
+
+Lexiconi transkriptsioon oli moderniseeritud: ilma ligatuurideta, ilma pika
+s-ita. Neli süstemaatilist parandust, kõik **originaalpildilt kontrollitud**:
+
+| reegel | näide | kus rakendub |
+|---|---|---|
+| `ae`/`oe` → `æ`/`œ`, ka suurtähtedes | `praeconium` → `præconium`, `GRAECO` → `GRÆCO` | eksport + pseudo |
+| `s` → `ſ` sõna alguses ja keskel, lõpus jääb `s` | `sponsor` → `ſponſor`, `possessio` → `poſſeſſio` | eksport + pseudo |
+| poogna signatuur lehe jalal on kursiivis | `G 5` → `<i>G 5</i>` | ainult pseudo |
+| jooksev pealkiri EI ole kursiivis | `160   θΥ θΩ` | ainult pseudo |
+
+Esimesed kaks on **transkriptsiooniparandused** ja lähevad seepärast ka
+VUTT-i eksporti (nagu homoglüüfiparandus); kaks viimast on märgendusreeglid
+ja jäävad pseudosse.
+
+**Ligatuurierandid.** `ae`/`oe` ei ole alati diftong. Pildilt kontrollitud:
+`coerceri` (lk 0155) ja `Israelitarum` (lk 0252) on trükitud lahku, sest
+co-+arceo ja Is-ra-el ei ole diftongid; `cœtus` (0026), `proœmium` (0283),
+`Ægypti` (0303), `GRÆCO` (0005) on ligatuuriga. Erandid on `NO_LIGATURE`-s.
+
+**Reamurdel `¬` jääb s pikaks** — lk 0014 `omiſ¬ / ſi`: sõna ei lõpe seal,
+kus rida lõpeb.
+
+**Kuldstandard on VUTT lk 176 = `gezelius-lexicon-0180`**, mille kasutaja
+käsitsi läbi tegi. Reegel taastoodab selle lehe **ladina osas 1:1** (27 reast
+lahknevad 3: kaks kreeka aktsenti, mis ei ole selle paranduse teema, ja
+lehe viimane custos `I. est`, mille kasutaja ise ütles mustrist väljas
+olevat — trükis on seal `eſt` ſt-ligatuuriga).
+
+**Sama leht paljastas ka `<i>` piiride ebajärjekindluse**, mis nüüd on
+näidise järgi joondatud: lõpupunkt ja reamurde `¬` jäävad tagi **sisse**
+(`<i>poſticum.</i>`, `<i>jaſpi¬</i>`), avasulg samuti, kui talle järgneb
+ladina sisu (`<i>(arbor quædam odora,) thya.</i>`), aga kreeka ees seisev
+etümoloogiasaba jääb **välja** (`<i>damnum: mulcta:</i> (à θέω)`); rida, mis
+on ainult etümoloogia, jääb tervenisti püsti (`(à θάω, & ὤψ.)`). Mõõdetuna:
+9 646 punkti ja 399 `¬` liikus tagi sisse.
+
+**Lahtine: indeks.** `PSEUDO_RANGE` on (21, 440), aga sõnastik lõpeb lehel
+0427 — lehed 0428–0440 on INDEX, kus „kreeka märksõna + kursiivne ladina
+gloss" struktuuri **ei ole** (lk 0428 pealkirjas vahelduvad kursiiv ja
+püstkiri sõnahaaval). Neid 13 lehte pseudomärgendus rikub. Ülempiiri
+kärpimine 427-le ootab otsust.
 
 **Piirang, mida ei saa siin parandada:** ekspordi pildid on **958×1654
 (1,6 Mpx)**, VUTT-i tavapildid on ~3200×2500 (8 Mpx) — **5× vähem piksleid**.
