@@ -19,6 +19,7 @@ Käivitamine:
 """
 
 import os
+import re
 import sys
 import csv
 import torch
@@ -62,17 +63,62 @@ for i, arg in enumerate(sys.argv):
 FROM_CHECKPOINT = Path(BASE_MODEL).exists()
 FRESH = not FROM_CHECKPOINT     # uus adapter → teine LR-retsept, vt SFTConfig
 
-# Andmeallikad. `data/lehekyljed` on 1. etapi 1500 lehte – ilma märgenduseta,
-# aga see on AINUS kreekaallikas (559 kreekarikkast lehest 549). Checkpointist
-# jätkates on nad juba adapteris ja teist korda ei ole vaja; baasilt treenides
-# on. `--ainult-vutt` lülitab nad käsitsi välja.
+# Andmeallikad. `data/lehekyljed` on 1. etapi 1500 lehte – valdavalt ilma
+# märgenduseta, aga see on peamine kreekaallikas: 743 kreekarikkast lehest 602
+# on siin, VUTT-is ainult 141 (mõõdetud 28.08; varem seisis siin 559/549).
+# Checkpointist jätkates on nad juba adapteris ja teist korda ei ole vaja;
+# baasilt treenides on. `--ainult-vutt` lülitab kogu allika välja,
+# `--valitud-lehekyljed` teeb sellest alamvaliku.
+#: `--valitud-lehekyljed` piirab 1. etapi 1500 lehte nendeni, mille NULL `<m>`
+#: on usaldusväärne. Mõõdetud 28.08.2026 (kogu CSV, `<m>` arv = 0 kõigil 1500-l):
+#:
+#:   Lexicon 21–440   420 lk   märgendatud, 12 493 sünteetilist `<i>`, 435 kreekarikast
+#:   Lexicon 2–20, 441–448  27 lk   eel-/järelmaterjal, ette valmistamata
+#:   Ianua 1–274     273 lk   märgendita, AGA lehel ei ole ääremärkusi ega kursiivi
+#:   Becker 1644      140 lk   fraktuur, ääremärkusteta, AGA sildita antiikva (vt allpool)
+#:   muu              640 lk   disputatsioonid, prantsuse tragikomöödiad
+#:
+#: Vale signaal on kaks eri liiki. „muu" 640 kannab ääremärkusi, mis on lehel
+#: olemas ja transkriptsioonis sildita (nt `image_0014` algab keset
+#: marginaaliviiteid). **Becker 1644** („Linteum Exorcisticum", Riia) on
+#: `<m>` mõttes aus – skaneeringult kontrollitud (00002, 00075, 00121), üks
+#: veerg, ääremärkusi ei ole – aga ta vahetab pea igal lehel fraktuuri ja
+#: antiikva vahel ja needki on sildita: 140 lehte `<cs>`-nulli. Kasutaja otsus
+#: 28.08: **mõlemad välja.** Becker tuleb ainult `data/vutt` kaudu, nii palju
+#: kui teda VUTT-is käsitsi märgendatud on (praegu lk 1–8, 37 `<cs>`), ja
+#: kasvab sedamööda, kuidas märgendus edeneb.
+#:
+#: Sees on seega ainult Lexiconi ette valmistatud vahemik ja Ianua – ausad
+#: nullid mõlemal teljel, ei ääremärkusi ega kursiivi lehel. Nemad kannavad ka
+#: kreeka: 553 kreekarikast lehte 602-st jääb alles. Lexiconi 27 ette
+#: valmistamata lehte jäävad välja, nende null ei ole kontrollitud.
+#:
+#: **Hind, mida tuleb hommikul mõõta:** fraktuur kukub 138 lehelt (Becker) 8
+#: VUTT-i Beckeri lehele + VUTT-i ülejäänud 64 `⸗`-lehele. Kui fraktuuri
+#: transkriptsioon halveneb, on põhjus siin. Väljundkaust saab `-vl` sufiksi.
+VALITUD_LEHEKYLJED = "--valitud-lehekyljed" in sys.argv
+
+_LEXICON_RE = re.compile(r"(\d+)_Gezelius_Lexicon")
+
+
+def valitud_lehekylg(failinimi: str) -> bool:
+    """Kas see 1. etapi leht on tag-nulli mõttes usaldusväärne?"""
+    b = os.path.basename(failinimi)
+    if "Comenius-Ianua" in b:
+        return True
+    m = _LEXICON_RE.match(b)
+    return bool(m) and 21 <= int(m.group(1)) <= 440
+
+
 DATA_SOURCES = [
     {"csv": "data/vutt/metadata.csv", "images": "data/vutt/images"},
 ]
 if not FROM_CHECKPOINT and "--ainult-vutt" not in sys.argv:
-    DATA_SOURCES.append(
-        {"csv": "data/lehekyljed/metadata_markup.csv", "images": "data/lehekyljed/images"}
-    )
+    DATA_SOURCES.append({
+        "csv": "data/lehekyljed/metadata_markup.csv",
+        "images": "data/lehekyljed/images",
+        "filter": valitud_lehekylg if VALITUD_LEHEKYLJED else None,
+    })
 
 # Holdout: lehed, mis jäävad treeningust välja, et uut ja vana mudelit saaks
 # samal materjalil võrrelda. Nimekirja teeb scripts/make_holdout_print.py.
@@ -99,12 +145,15 @@ DATE_STAMP  = datetime.now().strftime("%Y%m%d")
 _LIIK       = "markup" if FROM_CHECKPOINT else f"print-base-r{LORA_RANK}"
 if KEEP_M_ITALICS:
     _LIIK += "-mi"
+if VALITUD_LEHEKYLJED:
+    _LIIK += "-vl"
 OUTPUT_PATH = f"models/qwen3.5-ocr-{_LIIK}-{DATE_STAMP}"
 CKPT_DIR    = f"models/checkpoints-{_LIIK}-{DATE_STAMP}"
 
 print(f"Lähtepunkt:   {BASE_MODEL}")
 print(f"Salvestuskoht: {OUTPUT_PATH}")
 print(f"<i> <m> sees:  {'ALLES (--keep-m-italics)' if KEEP_M_ITALICS else 'eemaldatakse'}")
+print(f"1. etapi lehed: {'ainult Lexicon 21-440 + Ianua (--valitud-lehekyljed)' if VALITUD_LEHEKYLJED else 'kõik 1500'}")
 
 # ---------------------------------------------------------------------------
 # Eelkontrollid
@@ -188,13 +237,19 @@ class LehekyljAndmestik:
         cleaned_m = 0
         held_out = 0
 
+        filtered = 0
+
         for src in sources:
             csv_path   = src["csv"]
             images_dir = src["images"]
+            keep       = src.get("filter")
 
             with open(csv_path, encoding="utf-8", newline="") as f:
                 reader = csv.DictReader(f)
                 for row in reader:
+                    if keep and not keep(row["failinimi"]):
+                        filtered += 1
+                        continue
                     t = row.get("transkriptsioon", "")
                     if not isinstance(t, str) or not t.strip():
                         skipped += 1
@@ -221,6 +276,9 @@ class LehekyljAndmestik:
                         "transkriptsioon": t_clean,
                     })
 
+        if filtered:
+            print(f"  Valik: {filtered} 1. etapi lehte jäeti välja "
+                  f"(--valitud-lehekyljed).")
         if skipped:
             print(f"  Hoiatus: {skipped} rida jäeti vahele.")
         if cleaned_m:

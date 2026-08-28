@@ -40,6 +40,12 @@ csv.field_size_limit(10 ** 7)
 # eelskaleeritud andmestikul treenitud mudel eeldab, et ka inferents
 # skaleerib fit_to_budget()-iga. Vt SPIKKER.md "Piltide eelskaleerimine".
 RESIZE_IMAGES = "--resize" in sys.argv
+#: `--keep-m-italics` jätab `<i>` `<m>` sisse alles. Vaikimisi võtab
+#: `clean_markup` need maha – aga siis EI SAA `train_markup.py --keep-m-italics`
+#: neid enam tagasi tuua, sest CSV-s pole neid enam. Mõõdetud 28.08: strippimine
+#: kaotab VUTT-i poolelt 4 851 `<i>`-d (14 527 -> 9 676). Kui ehitad andmestikku
+#: `--keep-m-italics` A/B jaoks, PEAB see lipp siin ka olema.
+KEEP_M_ITALICS = "--keep-m-italics" in sys.argv
 
 DRY_RUN   = "--stats" in sys.argv
 
@@ -352,7 +358,8 @@ def main():
                 type_pages[wtype] += 1
                 continue
 
-            cleaned = clean_markup(transcription)
+            cleaned = clean_markup(
+                transcription, keep_marginalia_italics=KEEP_M_ITALICS)
             if cleaned != transcription:
                 cleaned_markup += 1
             transcription = cleaned
@@ -580,7 +587,8 @@ def main():
                 + (", + tundmatud" if INCLUDE_UNKNOWN else "")
                 + (", --only-empty" if ONLY_EMPTY else "")
                 + (f", --append allikas={ALLIKAS}" if APPEND else "")
-                + (", --resize" if RESIZE_IMAGES else "") + ")\n")
+                + (", --resize" if RESIZE_IMAGES else "")
+                + (", --keep-m-italics" if KEEP_M_ITALICS else "") + ")\n")
     print(f"  Päritolu: {source_path}")
 
     if OUT_EXPLICIT:

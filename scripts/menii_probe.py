@@ -7,7 +7,7 @@ lehtedel `<m>` panemata, kas see on **mudeli** omadus või **ahela** oma?
 
 GGUF-i tee saadab LANCZOS-PNG `fit_to_grid()`-võrel. Treening nägi hoopis
 toorpilti, mille image processor skaleeris igal epohhil ise BICUBIC-uga
-(ülevaade `docs/treening-ja-inferentsi-koodi-ulevaade-20260828.md`, punkt 5).
+(ülevaade `docs/arhiiv/treening-ja-inferentsi-koodi-ulevaade-20260828.md`, punkt 5).
 See skript käib **treeninguga samas ahelas**: toorpilt otse protsessorile.
 
   venv/bin/python scripts/menii_probe.py <mudel>
