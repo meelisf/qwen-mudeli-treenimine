@@ -363,7 +363,7 @@ def remove_empty_tags(text: str) -> str:
 #:
 #: Mudel näeb seega sama visuaalset mustrit kord tagituna, kord mitte, ilma
 #: nähtava vaheta – vasturääkiv signaal täpselt SELLE märgendi sees, mis on
-#: ainus kohustuslik (vt docs/plaan-trukipool-jargmine-treening.md punkt 0b).
+#: ainus kohustuslik (vt docs/arhiiv/plaan-trukipool-jargmine-treening.md punkt 0b).
 #:
 #: Normaliseerida saab ainult ühes suunas: ära võtta saab, juurde panna ei
 #: saa, sest me ei tea, kumb pool on trükitõde. Kuna marginaalide kursiiv ei
@@ -400,13 +400,28 @@ def normalize_hyphenation(text: str) -> str:
     return text.replace(_SOFT_HYPHEN, "-")
 
 
-def clean_markup(text: str) -> str:
+def clean_markup(text: str, keep_marginalia_italics: bool = False) -> str:
     """Viib VUTT markup'i treeningu kanoonilisele kujule.
 
     Parandused käivad püsipunktini, sest ühe vigase pesastuse lamendamine
     võib paljastada järgmise ristuva või tühja märgendipaari. Funktsiooni
     kasutavad nii andmestiku ehitaja kui treener, et CSV ja treeningusse
     jõudev tekst oleksid identsed.
+
+    `keep_marginalia_italics=True` jätab `<i>` `<m>` sisse alles. Vaikimisi
+    (False) võetakse maha – nii tehti jooksus `print-base-r64-20260827`.
+
+    **Miks see lipp olemas on.** Toorpildil on ~59 % marginaalidest (4 985 /
+    8 505) märgitud `<m><i>…</i></m>`, sest need ON lehel kursiivis (kontrollitud
+    skaneeringult, `1635-1 Menii` lk 0030). `<m>` ja `<i>` ei ole alternatiivid:
+    `<m>` on roll ja asukoht, `<i>` on tüpograafia – kaks telge sama teksti
+    kohta. Strippimine teeb nad marginaali jaoks teineteist välistavaks ja
+    õpetab mudelit kursiivi maha suruma just seal, kus ta seda näeb. Mõõdetud
+    tagajärg: Menii lehtedel märgib mudel ääreveeru `<i>`-ga (tüpograafiliselt
+    ÕIGE) ja jätab `<m>` panemata. Vt [[print-base-r64-20260828-tulemused]].
+
+    Hind, kui lipp on True: 41 teost märgivad marginaalikursiivi iseendaga
+    vastuoluliselt. Ehk see on A/B küsimus, mitte ilmne parandus.
     """
     text = normalize_hyphenation(unwrap_tags(text))
     for _ in range(10):
@@ -415,7 +430,8 @@ def clean_markup(text: str) -> str:
         cleaned = flatten_redundant_nested_tags(cleaned)
         cleaned = normalize_multiline_m_tags(cleaned)
         cleaned = balance_line_m_tags(cleaned)
-        cleaned = strip_italics_in_marginalia(cleaned)
+        if not keep_marginalia_italics:
+            cleaned = strip_italics_in_marginalia(cleaned)
         cleaned = remove_empty_m_tags(cleaned)
         cleaned = remove_empty_tags(cleaned)
         if cleaned == text:

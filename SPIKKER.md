@@ -122,7 +122,7 @@ Avajata sulgejaid ja sulgejata avajaid EI parandata: need on leheküljepiiri
 
 Lehed, mida parandus ainult vormistab ja mis vajavad VUTT-is käsitsi
 parandust (liigne `<m>` keset sõna, dubleeritud `<i>`), on loetletud failis
-`docs/katkised-lehed-20260721.txt`.
+`docs/arhiiv/katkised-lehed-20260721.txt`.
 
 ### Tühjad ja hõredad leheküljed treeningandmetes
 
@@ -475,7 +475,7 @@ Teenus kontrollib käivitamisel mõlemat serverit ja keeldub startimast, kui ük
 ei vasta. Lüliti on `ENGINE_CONFIGS` failis `kataloogi-jalgimine-ja-ocr.py`.
 
 **Mida see maksab – teadlik kompromiss.** Mõõdetud 143 VUTT-i lehel
-(`docs/llamacpp-juurdlus-20260827.md`):
+(`docs/arhiiv/llamacpp-juurdlus-20260827.md`):
 
 - Käsikiri: **pariteet** (CER 8,8 % vs unslothi 8,7 %), **4,2x kiirem**
 - Trükk: 135 puhtal lehel **rohkem** marginaale kui vanas teenuses

@@ -47,7 +47,7 @@ if TEST_MODE:
 # Etapp 1 checkpoint (baas) – backup enne markup treeningut.
 # `--base=unsloth/Qwen3.5-9B` treenib hoopis PUHTALT BAASILT: siis luuakse uus
 # adapter (vt FROM_CHECKPOINT allpool) ja `data/lehekyljed` tuleb kaasa võtta,
-# muidu kaob kreeka signaal. Vt docs/plaan-trukipool-jargmine-treening.md, 0c.
+# muidu kaob kreeka signaal. Vt docs/arhiiv/plaan-trukipool-jargmine-treening.md, 0c.
 BASE_MODEL = "models/qwen3.5-ocr-lora-backup-20260527"
 LORA_RANK = 16          # kehtib ainult siis, kui adapter luuakse uuena
 for i, arg in enumerate(sys.argv):
@@ -78,6 +78,13 @@ if not FROM_CHECKPOINT and "--ainult-vutt" not in sys.argv:
 # samal materjalil võrrelda. Nimekirja teeb scripts/make_holdout_print.py.
 HOLDOUT_PATH = Path("data/vutt/holdout.txt")
 USE_HOLDOUT = "--no-holdout" not in sys.argv
+
+#: `--keep-m-italics` jätab `<i>` `<m>` sisse alles (vaikimisi võetakse maha).
+#: A/B küsimus, mitte ilmne parandus – põhjendus on `convert_marginalia.
+#: clean_markup` docstring'is. Lühidalt: ~59 % marginaalidest ON lehel
+#: kursiivis, ja strippimine paneb `<m>` ja `<i>` samade pikslite pärast
+#: võistlema. Väljundkausta nimi saab `-mi` sufiksi, et jooksud ei seguneks.
+KEEP_M_ITALICS = "--keep-m-italics" in sys.argv
 HOLDOUT = set()
 if USE_HOLDOUT and HOLDOUT_PATH.exists():
     HOLDOUT = {
@@ -90,11 +97,14 @@ DATE_STAMP  = datetime.now().strftime("%Y%m%d")
 # Baasilt treenitud mudel on teine asi kui checkpointist jätkatu – eri nimi,
 # et neid ei saaks kogemata segi ajada ega üksteise peale kirjutada.
 _LIIK       = "markup" if FROM_CHECKPOINT else f"print-base-r{LORA_RANK}"
+if KEEP_M_ITALICS:
+    _LIIK += "-mi"
 OUTPUT_PATH = f"models/qwen3.5-ocr-{_LIIK}-{DATE_STAMP}"
 CKPT_DIR    = f"models/checkpoints-{_LIIK}-{DATE_STAMP}"
 
 print(f"Lähtepunkt:   {BASE_MODEL}")
 print(f"Salvestuskoht: {OUTPUT_PATH}")
+print(f"<i> <m> sees:  {'ALLES (--keep-m-italics)' if KEEP_M_ITALICS else 'eemaldatakse'}")
 
 # ---------------------------------------------------------------------------
 # Eelkontrollid
@@ -192,7 +202,8 @@ class LehekyljAndmestik:
                     # Sama puhastusahel ka siin: olemasolevad metadata.csv-d on
                     # ehitatud enne nende sammude lisamist ja sisaldavad veel
                     # <annN> tage ning ristuvat pesastust.
-                    t_clean = clean_markup(t)
+                    t_clean = clean_markup(
+                        t, keep_marginalia_italics=KEEP_M_ITALICS)
                     if not t_clean:
                         skipped += 1
                         continue

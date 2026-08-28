@@ -82,18 +82,21 @@ BASE_OCR_KAUST = "/home/mf/Dokumendid/LLM/AUTO-OCR"
 
 # Iga tüübi jaoks eraldi alamkaust ja mudel
 MODEL_CONFIGS = {
-    "print": "models/qwen3.5-ocr-markup-20260722",
+    "print": "models/qwen3.5-ocr-print-base-r64-20260827",
     "hand":  "models/qwen3.5-ocr-kurrent-20260602",
 }
 
 #: Mootor tüübi kaupa: "unsloth" (kohapeal GPU-l) või "llamacpp" (HTTP server).
 #:
 #: llama.cpp on Kurrendil mõõdetult PARITEEDIS ja 4,2x kiirem (CER 8,8 % vs
-#: 8,7 %, GPU 12,7 vs 25,2 GB) – vt docs/llamacpp-juurdlus-20260827.md.
-#: Trükipoolel on ta praegu KASUTUSKÕLBMATU: llama-server kaotab peene
-#: ääreveeru (issue #22785 / PR #21031 regressioon, EI OLE resolutsiooni-
-#: probleem). Kurrent on samast veast puudutatud ainult marginaalselt
-#: (12 lühikest rida 69 lehe peale, ~0,1 % sisust).
+#: 8,7 %, GPU 12,7 vs 25,2 GB) – vt docs/arhiiv/llamacpp-juurdlus-20260827.md.
+#:
+#: TRÜKIPOOL: varasem hinnang „kasutuskõlbmatu, kaotab peene ääreveeru" on
+#: 28.08.2026 ÜMBER LÜKATUD. Põhjus oli llama.cpp vaikne 4096-tokeniline
+#: pildipiir, mitte mootor; `--image-max-tokens 5000` + PNG + fit_to_grid
+#: annavad 20-lehesel GT-holdout'il transformersiga pariteedi (CER 1,9 % vs
+#: 2,0 %, `<m>` 169 vs 170) ja 5x kiiruse (6,2 vs 30,8 s/lk). Mõõtmine:
+#: scripts/eval_print.py, andmed data/vutt/eval/.
 #:
 #: AKTIVEERIMINE: vt SPIKKER.md "Käsikirjapool llama.cpp peale". Server peab
 #: käima ENNE teenuse käivitamist ja GPU-l ei ole ruumi mõlemale mootorile
@@ -160,7 +163,7 @@ for _mt, _eng in ENGINE_CONFIGS.items():
     # Server peab käima ENNE teenust ja tema pildieelarve peab vastama meie
     # omale. llama.cpp vaikepiir on 4096 visuaaltokenit, meil 5 120 000/1024 =
     # 5000; ilma --image-max-tokens 5000-ta kärbitakse pilt VAIKSELT ja peen
-    # kiri kaob (docs/llamacpp-juurdlus-20260827.md, Põhjus 1).
+    # kiri kaob (docs/arhiiv/llamacpp-juurdlus-20260827.md, Põhjus 1).
     import json as _json, urllib.request as _url
     try:
         with _url.urlopen(f"{_ep}/health", timeout=10) as _r:
@@ -265,7 +268,7 @@ def get_instruction(model_type: str) -> str:
     HOIATUS – teadaolev lahknevus, mida EI TOHI koos mootorivahetusega parandada:
     teenus on algusest saati saatnud MÕLEMALE tüübile `INSTRUCTION`-i, kuigi
     käsikirjamudel on treenitud `KURRENT_INSTRUCTION`-iga. Kogu Kurrendi
-    pariteedimõõtmine (docs/llamacpp-juurdlus-20260827.md) tehti seevastu
+    pariteedimõõtmine (docs/arhiiv/llamacpp-juurdlus-20260827.md) tehti seevastu
     KURRENT_INSTRUCTION-iga, ehk mõõdetud konfiguratsioon ei ole see, mida
     teenus praegu kasutab.
 
@@ -530,7 +533,7 @@ def process_batch_http(batch_items, model_type):
     """Sama töö llama-serveri kaudu. Sama .err semantika mis unslothi rajal.
 
     Kolm asja, mis on mõõdetud ja mida ei tohi tagasi keerata
-    (docs/llamacpp-juurdlus-20260827.md):
+    (docs/arhiiv/llamacpp-juurdlus-20260827.md):
 
     1. **`imaging.fit_to_grid()`** – pilt viiakse täpselt sellele patch-võrele,
        mida Qwen3.5 protsessor valiks. llama.cpp ümardab ise, aga ilma

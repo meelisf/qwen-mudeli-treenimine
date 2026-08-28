@@ -1,0 +1,4 @@
+gezeliuse leksikoni juures vaja muuta ae oe ligatuurideks
+sõna alguses ja keskel s pikaks, lõpus jääb tavaliseks
+poogna numbrid all italicus
+ülemise jooksvad pealkirjad ei ole italicus, 

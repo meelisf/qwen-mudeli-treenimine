@@ -7,7 +7,7 @@ mõõta: kõik VUTT-i lehed on treeningus ja „vaatame väljundeid" jääb
 muljepõhiseks.
 
 Valik on **marginaalikeskne**, sest `<m>` on ainus sine qua non
-(docs/plaan-trukipool-jargmine-treening.md, 0b). Kolm kihti:
+(docs/arhiiv/plaan-trukipool-jargmine-treening.md, 0b). Kolm kihti:
 
   marginaalirohke  10 lk  – kus `<m>` on ja kus mudel tavaliselt eksib
   marginaaliga      5 lk  – 1–3 `<m>`, tavaline juht

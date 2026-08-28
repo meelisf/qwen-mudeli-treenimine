@@ -3,7 +3,15 @@
 Ajalooliste dokumentide OCR (ladina, kreeka, fraktuur, Kurrent käsikiri)
 koos VUTT XML markup'iga. Suhtlus ja kommentaarid **eesti keeles**.
 
-## Loe kõigepealt SPIKKER.md
+## Loe kõigepealt SPIKKER.md ja docs/SEIS.md
+
+**`docs/SEIS.md` on elav dokument selle kohta, MIDA ME TEAME** – mis mudel on
+tootmises, mis on kindlaks tehtud, mis varasemates märkmetes on ümber lükatud,
+ja mis on lahtine. Loe see enne, kui kordad mõnest vanemast failist järeldust:
+28.08 kordas mudel ühest failist väidet, mille teine oli juba ümber lükanud.
+Lõpetatud uurimused on `docs/arhiiv/` – neid ei uuendata ja osa järeldusi seal
+EI KEHTI.
+
 
 **`SPIKKER.md` on täielik juhend** – käivitamine, torujuhe, andmete
 puhastusahel, mudeli testimine ja aktiveerimine, temperatuuri jälgimine,
