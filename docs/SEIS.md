@@ -8,11 +8,16 @@ lükanud.
 Tööjaotus: **`SPIKKER.md` = kuidas asju käivitada.** **See fail = mida me
 teame ja mis seisus oleme.** Arhiveeritud uurimused: `docs/arhiiv/`.
 
-Viimati uuendatud: **28.08.2026**
+Viimati uuendatud: **29.08.2026**
 
 ---
 
 ## 1. Mis praegu tootmises jookseb
+
+> **29.08 seisuga on kõik kolm teenust MAHA** — peatatud 28.08 treeningu ajaks
+> ja veel taastamata (nõuab sudo-t). Tabel kirjeldab konfiguratsiooni, mitte
+> hetkeseisu. Uus mudel `print-base-r64-mi-vl-20260828` ootab aktiveerimist,
+> vt §5.1.
 
 | teenus | port | mudel | mootor |
 |---|---|---|---|
@@ -83,6 +88,40 @@ Menii oli treeningus 0 lehte; **alates 28.08 andmestikust on seal 1 leht**
 (`r_acad_dorp_1635_1_0006`, 23 `<m>`, 10 `<i>`). `menii_probe.py` kasutab
 lehti 0020–0048, seega **sond on endiselt puhas**. Leht 0007 jäi välja: seal
 on `[tühi lehekülg]` märgend KOOS tekstiga — VUTT-is parandada.
+
+### 2.3.1 Märgendamata lehed OLID põhjus — katse 28.08 kinnitas
+
+`--keep-m-italics --valitud-lehekyljed` jooks
+(`models/qwen3.5-ocr-print-base-r64-mi-vl-20260828`, 1 793 näidet, 450 sammu,
+train_loss 0,061) vastas §2.3 küsimusele **jah**.
+
+| telg | vana (20260827) | uus (mi-vl) |
+|---|---|---|
+| Menii sond, `<m>` kokku 13 lehel | 70 | **207** |
+| holdout `<m>` (GT 185) | 170 | **181** |
+| holdout `<m>` sisu-CER | 13,1 % | **9,5 %** |
+| holdout `cer_plain` | 0,9 % | 0,8 % |
+| holdout `<cs>` (GT 16) | **16** | 11 |
+| fraktuur, märke/lk (Becker 9–140) | 1 669 | 1 663 |
+
+Menii 10 „kadunud" lehest **6 taastus täielikult** (0 → 19…33 `<m>`).
+Ülejäänud 4 (0025, 0027, 0029, 0037) on **uus, kitsam vealiik**: mudel loeb
+veeru rida-realt välja ja paneb iga rea `<i>`-sse, aga väline `<m>` jääb
+panemata (ainult-`<i>` ridu: 28 / 29 / 19 / 10; vanal 12 / 0 / 0 / 0). See on
+täpselt §2.2 telg — `<i>` võidab `<m>` üle.
+
+Kaks lehte läksid alla: 0020 (12 → 10) ja 0024 (31 → 22, pikast nimeloendist
+kaob 9 kirjet).
+
+**Fraktuur ei kannatanud** 132 märgendamata Beckeri lehe väljajätmisest:
+lehtedel 9–140 (vana mudel nägi neid treeningus, uus mitte) on lahknevus
+keskm 1,3 %, `⸗` 177 → 174, loope 0 mõlemal.
+
+CER-i pealkirjanumbrit (3,4 → 1,4 %) **ei tohi võtta puhta võiduna** — see
+tuleb valdavalt muutujast endast (`<i>` `<m>` sees, 103 → 242 / 270), mille
+eest vana mudelit karistatakse. Aus telg on `cer_plain`: muutumatu.
+
+Täisraport: `docs/markup-katvus-20260828-tulemused.md`.
 
 ### 2.4 Noatera on lehepõhine ja pöördub mootorit vahetades mõlemat pidi
 
@@ -241,14 +280,17 @@ paranemine on mõõdetav ainult Menii peal.
 
 ## 5. Lahtised küsimused, järjekorras
 
-1. **„Parem märgenduse katvus" jooks** — `--keep-m-italics --valitud-lehekyljed`,
-   ootab käivitamist. Kontrollrühm on tootmises (`print-base-r64-20260827`).
-   Formaalselt kaks muutujat, aga **kasutaja otsus 28.08: need on sisuliselt
-   sama telg** — mõlemad annavad mudelile ausama pildi sellest, mis lehel
-   märgendatud on. Küsimus, millele see vastab: kas märgendamata lehtede
-   sissevõtmine õpetas mudelit `<m>`-i välja jätma (§2.3 vealiik — loeb
-   ääreveeru, aga ei nimeta). Andmestik 1 793 näidet (vs 2 593), jooks ~3,5 h.
-   Käsud: mälus `keep-m-italics-ab-20260828`.
+1. **Uue mudeli aktiveerimine** — `print-base-r64-mi-vl-20260828` võitis
+   kontrollrühma `<m>` teljel selgelt (§2.3.1), aga **ei ole veel tootmises**.
+   Vaja: GGUF-i konversioon, `--image-max-tokens 5000` pariteedikontroll
+   holdoutil, siis `ENGINE_CONFIGS` failis `kataloogi-jalgimine-ja-ocr.py`.
+   Teenused seisavad praegu (treeningu ajaks peatatud) — vajavad sudo-ga
+   käivitamist.
+1b. **`<i>` võidab `<m>` üle** — Menii 0025/0027/0029/0037. Järelejäänud
+   vealiik pärast 28.08 katset; kitsam ja täpsemini sihitav kui vana.
+   Kandidaat järgmiseks katseks.
+1c. **`<cs>` regressioon holdoutil** (16 → 11). 20 lehte on vähe — kas päris?
+
 2. **`<m>` märgendust juurde** — ainus päris allikas on VUTT-is märgendamine.
    Menii 58 „Toores" lehte on treeningust täiesti väljas. Inimtöö, mitte GPU.
 3. **`train_on_responses_only` A/B** — praegu treenitakse 813-tokenist juhist
