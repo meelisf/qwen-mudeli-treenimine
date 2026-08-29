@@ -14,9 +14,10 @@ Viimati uuendatud: **29.08.2026 (öö)**
 
 ## 1. Mis praegu tootmises jookseb
 
-> **29.08 03:50 seisuga on kõik kolm teenust MAHA** — peatatud 28.08 treeningu
-> ajaks. GGUF ja pariteedikontroll on tehtud (§2.3.2), konfiguratsioon osutab
-> uuele mudelile, aga **käivitamine nõuab sudo-t ja on tegemata**.
+> **Uus trükimudel on tootmises alates 29.08 ~04:00.** GGUF, pariteedikontroll
+> ja aktiveerimine tehtud (§2.3.2). Suitsutest pärast käivitamist: fraktuurileht
+> `1626-…-hexen-predigt-146`, 6,5 s, `finish=stop`, 19 inline `<m>`, `⸗`
+> säilinud.
 
 | teenus | port | mudel | mootor |
 |---|---|---|---|
@@ -28,16 +29,23 @@ GPU 24,95 / 32,6 GB (uus trükiserver üksi 12,2 GB). Mõlemal serveril
 **`--image-max-tokens 5000`**, klient teeb **`fit_to_grid` + PNG**. Kõik kolm
 on kohustuslikud — vt §2.1.
 
-**Käivitamine (nõuab sudo-t):**
+**Käivitamine pärast treeningut / reebooti (nõuab sudo-t):**
 
 ```bash
 cd /home/mf/Dokumendid/LLM/qwen3.5
-sudo cp systemd/llama-server-print.service /etc/systemd/system/
+sudo cp systemd/llama-server-print.service /etc/systemd/system/   # kui unit muutus
 sudo systemctl daemon-reload
 sudo systemctl start llama-server-print llama-server-hand
 curl -s http://127.0.0.1:8080/health && curl -s http://127.0.0.1:8081/health
 sudo systemctl start ocr-service
 ```
+
+**Serverit sondeerides pane `"chat_template_kwargs": {"enable_thinking": false}`
+päringusse.** Ilma selleta läheb mudel mõtlemisrežiimi, põletab 4 096 tokenit
+ja tagastab **tühja `content`-i** `finish_reason: "length"`-iga — näeb välja
+nagu katkine mudel, aga on päringu viga. Kõik meie kliendid
+(`kataloogi-jalgimine-ja-ocr.py:578`, `eval_print.py`, `reocr_vutt.py`)
+saadavad selle lipu.
 
 Tagasi vanale trükimudelile: unit-faili `-m`/`--mmproj` read osutavad
 `print-base-r64-20260827`-le (varukoopia
@@ -45,6 +53,27 @@ Tagasi vanale trükimudelile: unit-faili `-m`/`--mmproj` read osutavad
 `markup-20260722`), `daemon-reload` + `restart`.
 
 Lüliti mootorite vahel: `ENGINE_CONFIGS` failis `kataloogi-jalgimine-ja-ocr.py`.
+
+### 1.1 Kettal hoitakse ainult seda, mida server loeb
+
+29.08 koristatud (103 GB, `models/` 160 → 56 GB):
+
+| kustutatud | maht | kuidas tagasi saab |
+|---|---|---|
+| `models/merged/*-bf16/` (4 tk) | 72 GB | `scripts/merge_lora.py <adapter>`, ~5 min |
+| `models/gguf/*-BF16.gguf` (2 tk) | 33 GB | `convert_hf_to_gguf.py`, kohe pärast merge'i |
+
+Mõlemad on **kvantimise vaheastmed** — server loeb ainult `*-Q8_0.gguf` +
+`mmproj-*-F16.gguf`. LoRA adapterid (`models/qwen3.5-ocr-*`, ~300 MB tk) on
+alles ja nad on tõeallikas; kogu ahel adapterist Q8_0-ni võtab 2,5 min.
+
+Alles jäi ka `markup-20260722` GGUF-i paar (9,7 GB) — kaks põlvkonda vana,
+aga see on ainus GGUF-kujul tagasitee, kui mõlemad uued mudelid peaksid
+kõlbmatuks osutuma.
+
+Puutumata: `models/checkpoints-*` (~9 GB kokku) — treeningu jätkamispunktid.
+Lõppadapterid on neist eraldi, seega need on suuresti surnud kaal; kustutamine
+on eraldi otsus, mida keegi pole veel teinud.
 
 ---
 
