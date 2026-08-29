@@ -27,6 +27,7 @@ Käivitamine:
   python scripts/train_kurrent.py           # täistreening, 20260602 retsept
   python scripts/train_kurrent.py --test    # kiirtest, 5 sammu, ei salvestata
   python scripts/train_kurrent.py --base models/muu-checkpoint
+  python scripts/train_kurrent.py --resume    # jätka viimasest checkpointist
 """
 
 import os
@@ -41,6 +42,7 @@ os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"
 
 from unsloth import FastVisionModel
 from trl import SFTTrainer, SFTConfig
+from transformers import TrainerCallback
 from unsloth.trainer import UnslothVisionDataCollator
 from PIL import Image as PILImage
 from prompt import KURRENT_INSTRUCTION
@@ -56,6 +58,8 @@ if TEST_MODE:
 BASE_MODEL = "unsloth/Qwen3.5-9B"   # vt docstring: 20260602 retsept
 LORA_RANK = 64                      # r=16 ei mahuta 17k lk mitmesajandilist korpust
 CUSTOM_STEPS = -1  # -1 = täisepohh
+SAVE_STEPS = 250   # ~1,9 h (27,9 s/samm); checkpoint 1,2 GB, alles hoitakse 3
+RESUME_FROM = None # --resume (viimane) või --resume=<tee checkpointini>
 
 for i, arg in enumerate(sys.argv):
     if arg.startswith("--base="):
@@ -66,6 +70,10 @@ for i, arg in enumerate(sys.argv):
         LORA_RANK = int(arg.split("=", 1)[1])
     elif arg.startswith("--steps="):
         CUSTOM_STEPS = int(arg.split("=", 1)[1])
+    elif arg.startswith("--resume="):
+        RESUME_FROM = arg.split("=", 1)[1]
+    elif arg == "--resume":
+        RESUME_FROM = "auto"
 
 # Kas baasmudel on lokaalne checkpoint (LoRA juba küljes) või HF mudel?
 FROM_CHECKPOINT = Path(BASE_MODEL).exists()
@@ -86,6 +94,32 @@ USE_HOLDOUT  = "--no-holdout" not in sys.argv
 DATE_STAMP  = datetime.now().strftime("%Y%m%d")
 OUTPUT_PATH = f"models/qwen3.5-ocr-kurrent-{DATE_STAMP}"
 CKPT_DIR    = f"models/checkpoints-kurrent-{DATE_STAMP}"
+
+# --resume: 33-tunnine jooks ületab südaöö, seega tänane DATE_STAMP oleks juba
+# teine kaust. Jätkame selle kaustaga, kust checkpoint tuli.
+if RESUME_FROM:
+    if RESUME_FROM == "auto":
+        dirs = sorted(Path("models").glob("checkpoints-kurrent-*"))
+        if not dirs:
+            print("Viga: --resume, aga models/checkpoints-kurrent-* puudub.")
+            sys.exit(1)
+        ckpt_root = dirs[-1]
+        ckpts = sorted(ckpt_root.glob("checkpoint-*"),
+                       key=lambda x: int(x.name.split("-")[1]))
+        if not ckpts:
+            print(f"Viga: {ckpt_root} ei sisalda ühtki checkpoint-N kausta.")
+            sys.exit(1)
+        RESUME_FROM = str(ckpts[-1])
+    else:
+        if not Path(RESUME_FROM).exists():
+            print(f"Viga: checkpoint ei leitud: {RESUME_FROM}")
+            sys.exit(1)
+        ckpt_root = Path(RESUME_FROM).parent
+
+    CKPT_DIR    = str(ckpt_root)
+    DATE_STAMP  = ckpt_root.name.replace("checkpoints-kurrent-", "")
+    OUTPUT_PATH = f"models/qwen3.5-ocr-kurrent-{DATE_STAMP}"
+    print(f"JÄTKAN checkpointist: {RESUME_FROM}")
 
 print(f"Lähtepunkt:    {BASE_MODEL}")
 print(f"Andmestik:     {DATA_CSV}")
@@ -259,13 +293,39 @@ trainer = SFTTrainer(
         dataset_text_field="",
         dataset_kwargs={"skip_prepare_dataset": True},
         dataloader_num_workers=0,
-        save_strategy="epoch",
-        save_total_limit=2,
+        save_strategy="no" if TEST_MODE else "steps",
+        save_steps=SAVE_STEPS,
+        save_total_limit=3,
     ),
 )
 
+class EpohhiLopuAdapter(TrainerCallback):
+    """Iga epohhi lõpus adapteri koopia kausta, mida save_total_limit ei rotee.
+
+    Rotatsioon kustutab ainult `checkpoint-N` kaustu, seega `epohh-N-adapter`
+    jääb alles. 20260602 jooksul selgus, et teine epohh annab vähe (loss
+    0,12 → 0,08) – epohh-1 adapter on hilisemaks A/B-ks vajalik.
+    Ainult adapter (~800 MB), ilma optimeerija olekuta: see ei ole
+    jätkamispunkt, vaid hindamiseks."""
+
+    def on_epoch_end(self, args, state, control, model=None, **kwargs):
+        if TEST_MODE:
+            return
+        n = int(round(state.epoch))
+        path = f"{CKPT_DIR}/epohh-{n}-adapter"
+        (model or trainer.model).save_pretrained(path)
+        print(f"\n  [epohh {n}, samm {state.global_step}] adapter salvestatud: {path}")
+
+
+trainer.add_callback(EpohhiLopuAdapter())
+
+if not TEST_MODE:
+    print(f"Checkpoint iga {SAVE_STEPS} sammu järel (~{SAVE_STEPS * 27.9 / 3600:.1f} h), "
+          f"alles 3 tk ({3 * 1.2:.1f} GB) → {CKPT_DIR}")
+    print(f"Katkemise korral jätkamine: venv/bin/python scripts/train_kurrent.py --resume")
+
 print("Alustan treeningut...")
-trainer_stats = trainer.train()
+trainer_stats = trainer.train(resume_from_checkpoint=RESUME_FROM)
 print(f"Treening lõppenud! Aeg: {round(trainer_stats.metrics['train_runtime'] / 60, 2)} min")
 
 # ---------------------------------------------------------------------------

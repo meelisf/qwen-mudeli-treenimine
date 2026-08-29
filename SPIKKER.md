@@ -348,7 +348,7 @@ Trükimudelit see ei puuduta – Kurrent on eraldi mudel.
 
 | # | Käsk | Mida oodata |
 |---|---|---|
-| 1 | `sudo systemctl stop ocr-service` | teenus hoiab GPU-l ~20 GB |
+| 1 | `sudo systemctl stop ocr-service llama-server-print llama-server-hand` | **kolm teenust**, kokku ~25,5 GB |
 | 2 | `nvidia-smi --query-gpu=memory.used --format=csv,noheader` | alla 1000 MiB |
 | 3 | `sudo nvidia-smi -pl 450` | lähtestub iga reboodiga |
 | 4 | `echo 1 \| sudo tee /sys/devices/system/cpu/intel_pstate/no_turbo` | CPU 77 °C → 55 °C |
@@ -373,9 +373,38 @@ jälle valed ja tulemuseks oleks hoopis teine mudel (vt commit a02a86c).
 venv/bin/python scripts/train_kurrent.py 2>&1 | tee /tmp/kurrent-treening.log
 ```
 
-Ootused: **2121 sammu epohhis, 2 epohhi = 4242 sammu, ~27,9 s/samm ≈ 33 h.**
+Ootused: **2122 sammu epohhis, 2 epohhi = 4244 sammu, ~27,9 s/samm ≈ 33 h.**
 Väljund `models/qwen3.5-ocr-kurrent-YYYYMMDD` (kuupäev = käivitamise päev),
-checkpointid `models/checkpoints-kurrent-YYYYMMDD/` (iga epohhi järel).
+checkpointid `models/checkpoints-kurrent-YYYYMMDD/`.
+
+### Checkpointid ja katkemine (muudetud 29.08.2026)
+
+`save_strategy="epoch"` tähendas, et esimene päästerõngas tekkis alles **12,3 h
+pärast** – crash 11. tunnil kaotas kõik. Nüüd:
+
+| säte | väärtus | tähendus |
+|---|---|---|
+| `save_steps` | 250 | checkpoint ~1,9 h tagant |
+| `save_total_limit` | 3 | 3,6 GB, vanemad roteeruvad välja |
+| `epohh-N-adapter/` | iga epohhi lõpus | ~800 MB, **rotatsioonist väljas** |
+
+Epohhi lõpu adapter on hindamiseks, mitte jätkamiseks (optimeerija olekut ei
+sisalda). Ta on vajalik selleks, et hiljem saaks võrrelda 1. ja 2. epohhi –
+20260602 jooksul andis teine epohh vähe (loss 0,12 → 0,08).
+
+**Katkemise järel jätkamine:**
+
+```bash
+venv/bin/python scripts/train_kurrent.py --resume
+```
+
+`--resume` ilma argumendita leiab viimase `models/checkpoints-kurrent-*` kausta
+ja suurima `checkpoint-N` selles. **Ta jätkab ka VANA kuupäevatempliga** – jooks
+kestab üle südaöö, ja ilma selleta tekiks `checkpoints-kurrent-<homme>`, uus tühi
+kaust, ning väljundmudel saaks vale nime. Konkreetne checkpoint:
+`--resume=models/checkpoints-kurrent-20260829/checkpoint-1500`.
+
+Enne jätkamist peavad teenused olema jälle maas (vt „Enne käivitamist").
 
 Lossi võrdluspunktid eelmisest jooksust (20260602) – kui number on
 kordades suurem, on midagi valesti:
@@ -384,8 +413,11 @@ kordades suurem, on midagi valesti:
 |---|---|
 | 10 | 1,5 |
 | 100 | 0,60 |
-| 1589 (epohh 1 lõpp) | 0,12 |
-| 3178 (epohh 2 lõpp) | 0,08 |
+| 1589 (epohh 1 lõpp, 20260602 skaalas) | 0,12 |
+| 3178 (epohh 2 lõpp, 20260602 skaalas) | 0,08 |
+
+NB: 20260602 jooksus oli epohh 1589 sammu (12 712 lk), nüüd 2122 (16 971 lk) –
+sammunumbrid ei ole otse võrreldavad, lossi tase samal epohhi osal on.
 
 ### Pärast treeningut
 

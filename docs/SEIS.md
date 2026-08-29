@@ -8,7 +8,7 @@ lükanud.
 Tööjaotus: **`SPIKKER.md` = kuidas asju käivitada.** **See fail = mida me
 teame ja mis seisus oleme.** Arhiveeritud uurimused: `docs/arhiiv/`.
 
-Viimati uuendatud: **29.08.2026 (öö)**
+Viimati uuendatud: **29.08.2026 (päev)**
 
 ---
 
@@ -375,7 +375,87 @@ paranemine on mõõdetav ainult Menii peal.
    endiselt oma koopial. Lahendus: lülitada `LoopStopper` mooduli
    konstantidele. **NB:** `D. D. D.` valehäiret siin EI OLE, vt §2.7.
 7. **`reocr_vutt.py` transformersi backend + nimekirja külmutamine.**
-8. **Kurrendi treening** lükkus edasi (28.08 ööl jooksis trükimudel).
+8. **Kurrendi treening** — käivitamisvalmis, §6. Lükkus 28.08-lt edasi
+   (sel ööl jooksis trükimudel).
 
 Punktid 3–7 on `docs/arhiiv/treening-ja-inferentsi-koodi-ulevaade-20260828.md`-st;
 sealt leiab põhjendused ja mõõtmised.
+
+---
+
+## 6. Kurrendi treening — käivitamisvalmis (29.08.2026)
+
+Töökäik on `SPIKKER.md`-s („Kurrent-treening (käsikiri)"). Siin ainult see,
+mis on **kontrollitud** ja mis on **muutunud**.
+
+### 6.1 Andmestik on terve — 20260602 vaikne viga on kadunud
+
+`data/kurrent/metadata.csv`: **17 044 rida, kõigil 17 044 on pilt olemas**,
+tühja transkriptsiooniga ridu 0. Holdout 73 → treeningusse **16 971**.
+
+See on see koht, kus 20260602 jooks vaikselt katki läks: CSV viitas
+piltidele, mida polnud, ja `aaeb_xiv_xvii` 1 992 lehte kukkusid ilma veateateta
+välja (koos veel 1 671 lehega neljast allikast). Uus jooks saab **+4 259 lk**
+võrreldes sellega, mida 20260602 tegelikult nägi — just seda XVI–XVII saj saksa
+materjali, mis oli hallutsineerimisdiagnoosi järgi puudu.
+
+| allikas | lehti | | allikas | lehti |
+|---|---|---|---|---|
+| kurrent_xix | 8 000 | | dresdner_1665 | 241 |
+| bullinger_autoren | 1 837 | | senatsprotokolle | 229 |
+| bergskollegium_rel_seg | 1 439 | | jonkopings | 57 |
+| hanse_kurrent_xvi | 1 144 | | bergskollegium_adv_seg | 53 |
+| svea_hovratt_seg | 847 | | gota_hovratt_seg | 51 |
+| trolldomskommissionen_seg | 761 | | koenigsfelden_adhr | 34 |
+| krigshovrattens_seg | 343 | | vutt_horedad | 26 |
+| aaeb_xiv_xvii | 1 982 | | **kokku** | **17 044** |
+
+**Kosmeetiline viga, mis EI blokeeri:** 2 039 real (aaeb 1 982 + jonkopings 57)
+puudub kolmas veerg `allikas` — need read on 2-veerulised. `train_kurrent.py`
+loeb ainult `failinimi` + `transkriptsioon`, seega treeningule mõju ei ole, aga
+`filter_dataset.py --stats` loeb neid „puuduva allikana". Parandada pärast
+jooksu, mitte enne — CSV muutmine treeningu all on täpselt see, mis 20260602
+segaduse tekitas.
+
+### 6.2 Skripti vaikeväärtused on nüüd õiged
+
+`--test` (29.08) kinnitas, et ilma lippudeta jooks kordab 20260602 retsepti:
+
+```
+Lähtepunkt:    unsloth/Qwen3.5-9B
+LoRA rank: 64          → trainable 203 913 216 / 9 613 726 960 (2,12 %)
+  Holdout: 73 lehte treeningust välja
+  Andmestik: 16971 näidet
+```
+
+Vana lõks (`BASE_MODEL` = trükiadapter, `LORA_RANK` = 16) on parandatud
+commitis a02a86c. Kui testjooks neid nelja rida ei näita — **peatu**.
+
+Ainus teadlik lahknevus retseptist: kollaatori `max_seq_length` on 8192, mitte
+2048. Pikad lehed ei kärbi; §2.6 järgi on eelarve niikuinii varuga.
+
+### 6.3 Checkpointimine — parandatud 29.08
+
+`save_strategy="epoch"` andis esimese päästerõnga alles **12,3 h pärast**.
+Nüüd `save_steps=250` (~1,9 h), `save_total_limit=3` (3,6 GB), ja iga epohhi
+lõpus `epohh-N-adapter/`, mida rotatsioon ei puutu (rotee ainult `checkpoint-N`).
+
+`trainer.train()` oli ilma resume-toeta — tagasiteed polnud olemas isegi siis,
+kui checkpoint oleks olnud. Nüüd `--resume`, mis leiab viimase checkpointi ise
+**ja jätkab vana kuupäevatempliga**: 33 h jooks ületab südaöö, ja naiivne
+taaskäivitus oleks teinud uue tühja `checkpoints-kurrent-<homme>` kausta.
+
+### 6.4 Mis jääb pärast jooksu tegemata
+
+- **GGUF-konversioon.** Käsikirjapool jookseb llama.cpp all
+  (`llama-server-hand`, port 8081), seega uus adapter tuleb merge'ida,
+  konverteerida, kvantida ja unit-faili tee uuendada — SPIKKER, „llama.cpp
+  mõlema mudeli all".
+- **Teenus saadab käsikirjamudelile `INSTRUCTION`-i, mitte
+  `KURRENT_INSTRUCTION`-it** (`kataloogi-jalgimine-ja-ocr.py:265`
+  `get_instruction()`). See on **teadlik**, mitte unustatud: hoiti nii, et
+  mootorivahetus jääks ainsaks muutujaks. Mõõdetud mõju 0,1 pp. Paranda
+  **eraldi sammuna**, mitte koos uue mudeliga.
+- **Loobituvastust ei ole llama.cpp serveril** — kliendipoolne
+  `loop_detect.is_looped()` on HTTP-teel olemas (rida 599), transformersi-tee
+  jookseb endiselt oma vanal koopial (§5.6).
