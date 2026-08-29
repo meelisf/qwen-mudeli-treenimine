@@ -157,11 +157,13 @@ selgelt parem, ilma et transkriptsioon või fraktuur oleks kannatanud.
 
 ## 7. Lahtised otsad
 
-- **Aktiveerimine** on tegemata. Vaja: GGUF-i konversioon + `--image-max-tokens 5000`
-  pariteedikontroll, siis `ENGINE_CONFIGS` failis `kataloogi-jalgimine-ja-ocr.py`.
+- ~~**Aktiveerimine** on tegemata~~ → **GGUF ja pariteet tehtud 29.08 öösel, §9.**
+  Unit-fail ja `MODEL_CONFIGS` osutavad uuele mudelile; jäänud on ainult
+  sudo-ga teenuste käivitamine.
 - **Teenused seisavad** (`ocr-service`, `llama-server-print`, `llama-server-hand`) —
-  vajavad sudo-ga käivitamist.
-- **`<cs>` regressioon** (16 → 11) — kas juhuslik või päris? 20 lehte on vähe.
+  vajavad sudo-ga käivitamist. Käsuplokk: `docs/SEIS.md` §1.
+- ~~**`<cs>` regressioon** (16 → 11)~~ → §9.3: 147 lehe peal 166 → 160, ehk
+  holdouti langus on pigem 20 lehe müra. Jälgi, aga eraldi katset ei nõua.
 - **Menii 0025/0027/0029/0037**: `<i>` võidab `<m>` üle. Järgmise katse kandidaat.
 - **Menii 0024** kaotas 9 marginaalikirjet pikast nimeloendist.
 - **Fraktuuril pole päris GT-d** lehtedele 9–140. Kui tahta päris mõõtu, märgi
@@ -176,6 +178,10 @@ data/vutt/eval/20260827-migt/                               # holdout, vana, sam
 data/vutt/reocr/menii-probe-qwen3.5-ocr-print-base-r64-mi-vl-20260828/
 data/vutt/reocr/menii-probe-qwen3.5-ocr-print-base-r64-20260827/
 data/vutt/reocr/becker-probe-*/
+data/vutt/eval/print-base-r64-mi-vl-Q8_0/          # holdout, uus GGUF (§9.1)
+data/vutt/eval/print-base-r64-Q8_0/                # holdout, vana GGUF, sama GT-ga
+data/vutt/reocr/print-base-r64-mi-vl-Q8_0/         # 153 Toores lehte, uus GGUF (§9.2-9.3)
+data/vutt/reocr/print-base-r64-Q8_0/               # 147 Toores lehte, vana GGUF
 ```
 
 Kordamine:
@@ -187,3 +193,76 @@ venv/bin/python scripts/eval_print.py --keep-m-italics --resume --name 20260827-
 venv/bin/python scripts/menii_probe.py models/qwen3.5-ocr-print-base-r64-mi-vl-20260828
 venv/bin/python scripts/becker_probe.py
 ```
+
+---
+
+## 9. GGUF-i konversioon ja pariteedikontroll (29.08, öö)
+
+`scripts/merge_lora.py` → `convert_hf_to_gguf.py --no-nextn` → `--mmproj`
+→ `llama-quantize Q8_0`. Kokku **2,5 min** (merge 03:22 → valmis 03:24).
+
+```
+models/gguf/print-base-r64-mi-vl-20260828-Q8_0.gguf         9 527 501 440 B
+models/gguf/mmproj-print-base-r64-mi-vl-20260828-F16.gguf     918 165 472 B
+models/gguf/print-base-r64-mi-vl-20260828-BF16.gguf        17 920 696 960 B (vahefail)
+```
+
+Server käivitati käsitsi `--image-max-tokens 5000 -ngl 99 -c 65536 -np 4 -cb
+-fa on` peal, GPU 12,2 GB. **Kärpekontroll:** pildiga päringu
+`prompt eval ... / 5783 tokens` ehk ~4 950 visuaaltokenit — täpselt see, mida
+§2.1 nõuab (alla ~4 100 tähendaks, et lipp on puudu).
+
+### 9.1 Holdout (20 lehte), kõik neli kombinatsiooni sama GT-ga
+
+Kõik neli rida on skooritud `--keep-m-italics` GT vastu, muidu poleks CER
+võrreldav (vana GGUF-i rida on `--resume`-ga ümber skooritud).
+
+| | CER | `cer_plain` | `<m>` /185 | `<m>` sisu-CER | `<cs>` /16 | s/lk |
+|---|---|---|---|---|---|---|
+| vana, transformers (`20260827-migt`) | 3,4 % | 0,86 % | 170 | 13,1 % | 16 | 30,8 |
+| vana, GGUF Q8_0 | 3,2 % | 0,82 % | 169 | 13,1 % | 17 | 6,2 |
+| **uus mi-vl, transformers** | 1,4 % | 0,78 % | 181 | 9,5 % | 11 | 33,1 |
+| **uus mi-vl, GGUF Q8_0** | **1,5 %** | **0,80 %** | **182** | **9,8 %** | 11 | **6,5** |
+
+**Pariteet on olemas.** Uue mudeli GGUF ja transformers lahknevad `<m>`-is ühe
+tagi võrra (182 vs 181) ja CER-is 0,1 pp — sama suurusjärk mis 27.08 mõõdetud
+vana mudeli pariteet. Kiirus 5x.
+
+### 9.2 Menii sond GGUF-i ahelas (13 lehte)
+
+Sama 13 lehte, aga **tootmisahelas** (`fit_to_grid` + PNG + llama-server),
+mitte `menii_probe.py` toorpildi-ahelas. Read on `reocr_vutt.py` väljundist.
+
+| ahel | `<m>` kokku | lehe kaupa |
+|---|---|---|
+| vana GGUF | 98 | `0 0 0 0 0 0 0 0 0 0 39 27 32` |
+| **uus GGUF** | **205** | `0 0 22 11 20 26 20 19 0 0 37 27 23` |
+| (võrdluseks: uus transformers) | 207 | `0 0 22 10 20 26 28 19 0 0 33 27 22` |
+
+Katvusvõit **kandub GGUF-i üle täies mahus** (98 → 205, transformersil 70 →
+207). Samad neli lehte (0025/0027/0029/0037 = positsioonid 9, 1, 2, 10) jäävad
+nulli mõlemal mootoril — §1b vealiik on mudeli oma, mitte ahela oma.
+
+### 9.3 Lai A/B: 147 ühist „Toores" lehte, vana GGUF vs uus GGUF
+
+`reocr_vutt.py` andis seekord 153 lehte (nimekiri on päring ja kasvab, §4);
+võrreldud on 147 ühist.
+
+| | `<m>` | `<i>` | `<cs>` | märke | loope |
+|---|---|---|---|---|---|
+| vana GGUF | 590 | 1 394 | 166 | 281 670 | 3 |
+| uus GGUF | **635** | 3 160 | 160 | 286 168 | 3 |
+
+`<i>` kahekordistumine on katse muutuja ise (`<m>` sees olev kursiiv jäeti
+alles), mitte regressioon. `<cs>` 166 → 160 — **holdouti 16 → 11 ei paista
+korpuse peal**, ehk §1c on pigem 20 lehe müra kui päris regressioon.
+
+Loope 3 mõlemal, aga eri lehtedel: vana `1638_39_0133`, uus `1638_39_0135`
+(mõlemal ühised `…tvh4im-253` ja `1638_39_0044`). Loopiv leht liigub, arv ei
+kasva.
+
+### 9.4 Otsus
+
+Konversioon ja pariteet on tehtud, mudel läheb tootmisse. Aktiveerimise
+käsuplokk on `SPIKKER.md`-s ja `docs/SEIS.md` §1-s — **nõuab sudo-t**, seega
+seda sammu skript ise teha ei saanud.

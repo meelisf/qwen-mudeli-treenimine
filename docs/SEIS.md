@@ -8,29 +8,43 @@ lükanud.
 Tööjaotus: **`SPIKKER.md` = kuidas asju käivitada.** **See fail = mida me
 teame ja mis seisus oleme.** Arhiveeritud uurimused: `docs/arhiiv/`.
 
-Viimati uuendatud: **29.08.2026**
+Viimati uuendatud: **29.08.2026 (öö)**
 
 ---
 
 ## 1. Mis praegu tootmises jookseb
 
-> **29.08 seisuga on kõik kolm teenust MAHA** — peatatud 28.08 treeningu ajaks
-> ja veel taastamata (nõuab sudo-t). Tabel kirjeldab konfiguratsiooni, mitte
-> hetkeseisu. Uus mudel `print-base-r64-mi-vl-20260828` ootab aktiveerimist,
-> vt §5.1.
+> **29.08 03:50 seisuga on kõik kolm teenust MAHA** — peatatud 28.08 treeningu
+> ajaks. GGUF ja pariteedikontroll on tehtud (§2.3.2), konfiguratsioon osutab
+> uuele mudelile, aga **käivitamine nõuab sudo-t ja on tegemata**.
 
 | teenus | port | mudel | mootor |
 |---|---|---|---|
-| `llama-server-print` | 8080 | `print-base-r64-20260827-Q8_0` | llama.cpp |
+| `llama-server-print` | 8080 | `print-base-r64-mi-vl-20260828-Q8_0` ⬅ uus | llama.cpp |
 | `llama-server-hand` | 8081 | `kurrent-20260602-Q8_0` | llama.cpp |
 | `ocr-service` | — | klient mõlemale | HTTP |
 
-GPU 24,95 / 32,6 GB. Mõlemal serveril **`--image-max-tokens 5000`**, klient
-teeb **`fit_to_grid` + PNG**. Kõik kolm on kohustuslikud — vt §2.1.
+GPU 24,95 / 32,6 GB (uus trükiserver üksi 12,2 GB). Mõlemal serveril
+**`--image-max-tokens 5000`**, klient teeb **`fit_to_grid` + PNG**. Kõik kolm
+on kohustuslikud — vt §2.1.
 
-Lüliti: `ENGINE_CONFIGS` failis `kataloogi-jalgimine-ja-ocr.py`.
-Trükiserveri unit-faili varukoopia:
-`/etc/systemd/system/llama-server-print.service.bak-20260828`.
+**Käivitamine (nõuab sudo-t):**
+
+```bash
+cd /home/mf/Dokumendid/LLM/qwen3.5
+sudo cp systemd/llama-server-print.service /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl start llama-server-print llama-server-hand
+curl -s http://127.0.0.1:8080/health && curl -s http://127.0.0.1:8081/health
+sudo systemctl start ocr-service
+```
+
+Tagasi vanale trükimudelile: unit-faili `-m`/`--mmproj` read osutavad
+`print-base-r64-20260827`-le (varukoopia
+`/etc/systemd/system/llama-server-print.service.bak-20260828` on veel VANEM,
+`markup-20260722`), `daemon-reload` + `restart`.
+
+Lüliti mootorite vahel: `ENGINE_CONFIGS` failis `kataloogi-jalgimine-ja-ocr.py`.
 
 ---
 
@@ -122,6 +136,32 @@ tuleb valdavalt muutujast endast (`<i>` `<m>` sees, 103 → 242 / 270), mille
 eest vana mudelit karistatakse. Aus telg on `cer_plain`: muutumatu.
 
 Täisraport: `docs/markup-katvus-20260828-tulemused.md`.
+
+### 2.3.2 Uue mudeli GGUF on pariteedis ja katvusvõit kandub üle
+
+Konverteeritud 29.08 öösel (`merge_lora` → `convert_hf_to_gguf --no-nextn` →
+`--mmproj` → `llama-quantize Q8_0`, kokku 2,5 min). Kärpekontroll korras:
+pildiga päring 5 783 prompt-tokenit ≈ 4 950 visuaali.
+
+Holdout, kõik neli kombinatsiooni **sama `--keep-m-italics` GT vastu**:
+
+| | CER | `cer_plain` | `<m>` /185 | `<cs>` /16 | s/lk |
+|---|---|---|---|---|---|
+| vana, transformers | 3,4 % | 0,86 % | 170 | 16 | 30,8 |
+| vana, GGUF | 3,2 % | 0,82 % | 169 | 17 | 6,2 |
+| uus mi-vl, transformers | 1,4 % | 0,78 % | 181 | 11 | 33,1 |
+| **uus mi-vl, GGUF** | 1,5 % | 0,80 % | **182** | 11 | **6,5** |
+
+Menii sond tootmisahelas (`reocr_vutt.py`, 13 lehte): vana GGUF **98** → uus
+GGUF **205** `<m>` (transformersil 70 → 207). Samad neli lehte
+(0025/0027/0029/0037) jäävad nulli mõlemal mootoril — §5.1b vealiik on
+**mudeli**, mitte ahela oma.
+
+Lai A/B 147 ühisel „Toores" lehel: `<m>` 590 → 635, `<cs>` 166 → 160, loope
+3 → 3 (eri lehtedel). **Holdouti `<cs>` langus 16 → 11 korpuse peal ei
+paista** — see oli 20 lehe müra.
+
+Täisraport: `docs/markup-katvus-20260828-tulemused.md` §9.
 
 ### 2.4 Noatera on lehepõhine ja pöördub mootorit vahetades mõlemat pidi
 
@@ -274,22 +314,20 @@ kadus kogu veerg (vana GGUF: 3 lehel). Vealiik on siiski parem — §2.3.
 paranemine on mõõdetav ainult Menii peal.
 
 **Nimekiri EI OLE külmutatud:** `reocr_vutt.py` valik on päring ja kasvab
-(143 → 147). Ajaloolist võrreldavust see rikub.
+(143 → 147 → 153). Ajaloolist võrreldavust see rikub.
 
 ---
 
 ## 5. Lahtised küsimused, järjekorras
 
-1. **Uue mudeli aktiveerimine** — `print-base-r64-mi-vl-20260828` võitis
-   kontrollrühma `<m>` teljel selgelt (§2.3.1), aga **ei ole veel tootmises**.
-   Vaja: GGUF-i konversioon, `--image-max-tokens 5000` pariteedikontroll
-   holdoutil, siis `ENGINE_CONFIGS` failis `kataloogi-jalgimine-ja-ocr.py`.
-   Teenused seisavad praegu (treeningu ajaks peatatud) — vajavad sudo-ga
-   käivitamist.
+1. **Uue mudeli aktiveerimine** — GGUF, pariteet ja konfiguratsioon on tehtud
+   (§2.3.2). Jäänud on **ainult teenuste käivitamine sudo-ga** — käsuplokk §1-s.
 1b. **`<i>` võidab `<m>` üle** — Menii 0025/0027/0029/0037. Järelejäänud
    vealiik pärast 28.08 katset; kitsam ja täpsemini sihitav kui vana.
-   Kandidaat järgmiseks katseks.
-1c. **`<cs>` regressioon holdoutil** (16 → 11). 20 lehte on vähe — kas päris?
+   §2.3.2 näitas, et see on mudeli, mitte ahela omadus (mõlemal mootoril samad
+   4 lehte nullis). **Kandidaat järgmiseks katseks.**
+1c. ~~**`<cs>` regressioon holdoutil** (16 → 11)~~ — 147 lehe peal 166 → 160,
+   ehk müra. Suletud, §2.3.2.
 
 2. **`<m>` märgendust juurde** — ainus päris allikas on VUTT-is märgendamine.
    Menii 58 „Toores" lehte on treeningust täiesti väljas. Inimtöö, mitte GPU.

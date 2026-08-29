@@ -458,8 +458,12 @@ Mõlemad tüübid käivad nüüd llama.cpp kaudu. Iga mudel vajab OMA serverit:
 
 | tüüp | port | mudel |
 |---|---|---|
-| print | 8080 | `markup-20260722-Q8_0.gguf` + `mmproj-markup-20260722-F16.gguf` |
+| print | 8080 | `print-base-r64-mi-vl-20260828-Q8_0.gguf` + `mmproj-…-F16.gguf` |
 | hand | 8081 | `kurrent-20260602-Q8_0.gguf` + `mmproj-kurrent-20260602-F16.gguf` |
+
+Trükimudel on vahepeal kaks korda vahetunud (`markup-20260722` →
+`print-base-r64-20260827` → `print-base-r64-mi-vl-20260828`); ajalugu ja
+mõõtmised on `docs/SEIS.md`-s.
 
 Mõlemad mahuvad korraga GPU-le: **22,1 GB / 32,6 GB**.
 
@@ -516,7 +520,7 @@ Käsikirjamudel elab `kataloogi-jalgimine-ja-ocr.py` failis:
 
 ```python
 MODEL_CONFIGS = {
-    "print": "models/qwen3.5-ocr-markup-20260722",
+    "print": "models/qwen3.5-ocr-print-base-r64-mi-vl-20260828",
     "hand":  "models/qwen3.5-ocr-kurrent-20260602",   # <- see rida
 }
 ```
@@ -588,7 +592,7 @@ sudo systemctl start ocr-service
 
 | Kataloog | Sisu |
 |---|---|
-| `models/qwen3.5-ocr-markup-20260722/` | **aktiivne trükimudel** (ocr-service, `print`) |
+| `models/qwen3.5-ocr-print-base-r64-mi-vl-20260828/` | **aktiivne trükimudel** (ocr-service, `print`) |
 | `models/qwen3.5-ocr-kurrent-20260602/` | **aktiivne käsikirjamudel** (ocr-service, `hand`) |
 | `models/qwen3.5-ocr-lora-backup-20260527/` | etapp 1, puhas transkriptsioon – markup-treeningu lähtepunkt |
 | `models/qwen3.5-ocr-markup-YYYYMMDD/` | uued trükimudeli checkpointid |
