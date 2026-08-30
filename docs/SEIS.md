@@ -445,7 +445,17 @@ kui checkpoint oleks olnud. Nüüd `--resume`, mis leiab viimase checkpointi ise
 **ja jätkab vana kuupäevatempliga**: 33 h jooks ületab südaöö, ja naiivne
 taaskäivitus oleks teinud uue tühja `checkpoints-kurrent-<homme>` kausta.
 
-### 6.4 Mis jääb pärast jooksu tegemata
+### 6.4 Jooks käib — järelahel on automatiseeritud (30.08.2026)
+
+Treening algas 29.08 14:15, seis 30.08 16:15: **3040/4244 sammu (72 %)**,
+~30,3 s/samm, loss 0,07–0,10, ETA **31.08 ~02:20**.
+
+Järelahel (GGUF-konversioon + kolm hindamisjooksu) on **kirjutatud valmis ja
+ootab treeningu lõppu detacheeritud shelliskriptina** — ei vaja inimest ega
+elavat Claude-sessiooni. Täpne kirjeldus, failiteed, logid ja see, mis jääb
+INIMESE otsustada: **`docs/kurrent-20260829-oine-ahel.md`**.
+
+### 6.5 Mis jääb pärast jooksu tegemata
 
 - **GGUF-konversioon.** Käsikirjapool jookseb llama.cpp all
   (`llama-server-hand`, port 8081), seega uus adapter tuleb merge'ida,
