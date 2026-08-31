@@ -143,7 +143,7 @@ jooksu poole lühemaks lõigata ei tasu.
 
 Väljundid: `data/kurrent/eval/{kurrent-20260829-Q8_0,qwen3.5-ocr-kurrent-20260829,kurrent-20260829-epohh1}/`
 (iga kaust: lehekaupa `.txt`, `results.csv`, `run.json`).
-Ahela kirjeldus ja logid: `docs/kurrent-20260829-oine-ahel.md`.
+Ahela kirjeldus ja logid: `docs/arhiiv/kurrent-20260829-oine-ahel.md`.
 
 ---
 

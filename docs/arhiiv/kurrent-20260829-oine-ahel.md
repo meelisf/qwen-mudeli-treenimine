@@ -81,4 +81,4 @@ Kontroll, kas ajur veel elab: `pgrep -af oo_eval.sh` (pid 3207267).
 - **Epohh 1 vs 2** — 20260602 puhul andis teine epohh vähe. Kui vahe on väike,
   saab järgmise jooksu poole lühemaks.
 
-**Ajuri koopia repos:** `docs/kurrent-20260829-oine-ahel.sh` (scratchpad kaob reboodiga).
+**Ajuri koopia repos:** `docs/arhiiv/kurrent-20260829-oine-ahel.sh` (scratchpad kaob reboodiga).

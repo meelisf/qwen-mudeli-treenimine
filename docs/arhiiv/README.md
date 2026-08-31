@@ -16,4 +16,9 @@ pärast.
 | `plaan.md`, `finetune-qwen-3-5.md` | algsed märtsi plaanid ja seadistusjuhend | asendatud `SPIKKER.md`-ga |
 | `treening-ja-inferentsi-koodi-ulevaade-20260828.md` | 28.08 koodiülevaade: kus treening- ja inferentsikood mudeliga ei sobitu | leiud on üle viidud SEIS §2.6 ja §5.3–5.7. **Punkt 7 (`D. D. D.` valehäire) on ümber lükatud** — vt SEIS §2.7 |
 | `gemini-3.7-flash-markused-20260828.md` | Gemini 3.7 Flashi seisuanalüüs | ~90 % SEIS-i ja ülaltoodud ülevaate ümbersõnastus; ainus uus leid (loobituvastuse kaks lahku jooksnud koopiat) on SEIS §5.6-s. Kordas ka ümber lükatud `D. D. D.` väidet |
+| `markup-katvus-20260828-tulemused.md` | märgenduskatvuse katse täisraport (Menii `<m>` 70 → 207) | katse tehtud ja mudel tootmises 29.08-st; kokkuvõte SEIS §2.3 |
+| `kurrent-20260829-oine-ahel.md` + `.sh` | 30./31.08 öine järelahel: ootas treeningu lõppu, tegi GGUF-i ja kolm hindamisjooksu | ahel läbitud 31.08 03:36, kõik sammud exit=0; tulemused `docs/kurrent-20260829-tulemused.md` |
+| `kurrent-strateegia.md` | Kurrendi strateegia ja 20260602 diagnoos (juuni) | lehearv („16 579") on vale, õige on 12 712; **diagnoos ise KEHTIB endiselt** — herrnhutlaste lühendid ja eesti kohanimed, kinnitust saanud 31.08 Kambja lehel, vt SEIS §3.4 |
+| `kataloogi-jalgimine-ja-ocr-20260107.py`, `ocr-service-20260107.service` | jaanuarikuised koopiad `docs/`-i all | **lahknesid päris failidest** — elav teenus on repo juurkataloogis ja `/etc/systemd/system/`-is; koopiad olid lõks |
+| `näidis-lehekylje-treenimine.py` | novembri 2025 näidisskript | asendatud `scripts/train*.py`-ga |
 | `katkised-lehed-20260721.txt` | juuli tööjärg katkiste lehtedega | tööjärg tehtud/aegunud |
