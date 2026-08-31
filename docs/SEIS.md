@@ -445,15 +445,34 @@ kui checkpoint oleks olnud. Nüüd `--resume`, mis leiab viimase checkpointi ise
 **ja jätkab vana kuupäevatempliga**: 33 h jooks ületab südaöö, ja naiivne
 taaskäivitus oleks teinud uue tühja `checkpoints-kurrent-<homme>` kausta.
 
-### 6.4 Jooks käib — järelahel on automatiseeritud (30.08.2026)
+### 6.4 Jooks on LÄBI — uus mudel võidab selgelt (31.08.2026)
 
-Treening algas 29.08 14:15, seis 30.08 16:15: **3040/4244 sammu (72 %)**,
-~30,3 s/samm, loss 0,07–0,10, ETA **31.08 ~02:20**.
+Treening 29.08 14:15 → 31.08 02:35, 36,3 h, 4244 sammu, loss 0,132.
+Väljund `models/qwen3.5-ocr-kurrent-20260829`, GGUF tehtud ja mõõdetud.
 
-Järelahel (GGUF-konversioon + kolm hindamisjooksu) on **kirjutatud valmis ja
-ootab treeningu lõppu detacheeritud shelliskriptina** — ei vaja inimest ega
-elavat Claude-sessiooni. Täpne kirjeldus, failiteed, logid ja see, mis jääb
-INIMESE otsustada: **`docs/kurrent-20260829-oine-ahel.md`**.
+**Puhaste lehtede mediaan-CER 6,5 % → 4,1 %.** 23 lehel, mida vana mudel
+treeningul ei näinud, poolestus: 8,6 % → 4,0 %. Q8_0 on bf16-ga pariteedis
+(mõlemal 4,1 %) ja **4,6x kiirem** (4,5 vs 20,8 s/lk) — see mõõtmine tehti
+esimest korda `--image-max-tokens 5000` lipuga, mis oli võlgu.
+
+Kaks asja, mida treening EI parandanud:
+- **Loobid on lehepõhised, mitte andmete puudus.** senatsprotokolle'i 229 lk
+  lisamine parandas allika mediaani 20,0 % → 7,2 %, aga leht
+  `16590_senatsp_UAT_047_19_017` loobib transformersi teel edasi (ratio
+  2,93 → 4,88); Q8_0-l on ta korras. Kinnitab §2.4.
+- **`bullinger_autoren` läks +2,0 pp halvemaks** (9 lk) — ainus regressioon,
+  põhjus kontrollimata.
+
+Teine epohh tasus end ära (mediaan 4,9 % → 4,1 % + kadus üks ratio-27 loop) —
+erinevalt 20260602-st.
+
+**Täisnumbrid, allika kaupa tabel ja loopide analüüs:
+`docs/kurrent-20260829-tulemused.md`.** Ahel ja logid:
+`docs/kurrent-20260829-oine-ahel.md`.
+
+**Mudel EI OLE aktiveeritud** ja kolm teenust on 29.08-st maas
+(`ocr-service`, `llama-server-print`, `llama-server-hand`) — VUTT-i OCR
+ei tööta, kuni need üles pannakse. Nõuab sudot.
 
 ### 6.5 Mis jääb pärast jooksu tegemata
 
