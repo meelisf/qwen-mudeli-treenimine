@@ -476,11 +476,14 @@ ei tööta, kuni need üles pannakse. Nõuab sudot.
 
 ### 6.5 Mis jääb pärast jooksu tegemata
 
-- ~~**GGUF-konversioon.**~~ **TEHTUD 31.08 02:40** —
-  `models/gguf/kurrent-20260829-Q8_0.gguf` + `mmproj-kurrent-20260829-F16.gguf`,
-  mõõdetud pariteedis (§6.4). **Tegemata on ainult unit-faili tee uuendus**
-  (`llama-server-hand.service`) ja `MODEL_CONFIGS["hand"]` — SPIKKER,
-  „llama.cpp mõlema mudeli all". Nõuab sudot.
+- ~~**GGUF-konversioon ja aktiveerimine.**~~ **TEHTUD 31.08 04:17–04:20.**
+  `llama-server-hand` (8081) = `kurrent-20260829-Q8_0`, `llama-server-print`
+  (8080) = `print-base-r64-mi-vl-20260828` (muutumatu). Kontrollitud: mõlemad
+  vastavad, käsureal `--image-max-tokens 5000`, päris pildil **4930/4932
+  visuaaltokenit** (kärbet ei ole), OCR 5,5 s käsikiri / 8,8 s trükk,
+  GPU 24,3/32,6 GB. Vana unit-faili varukoopia:
+  `/etc/systemd/system/llama-server-hand.service.bak-20260829`.
+  **Kasutaja katsetab paar päeva** enne lõplikku otsust.
 - **Loobituvastus on nüüd mõõdetud vajadus, mitte teoreetiline.** Kaks lehte
   loobivad uue mudeliga ka Q8_0-l ja üks kõigis viies jooksus — treening seda
   ei paranda (§6.4).

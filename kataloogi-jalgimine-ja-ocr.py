@@ -83,7 +83,7 @@ BASE_OCR_KAUST = "/home/mf/Dokumendid/LLM/AUTO-OCR"
 # Iga tüübi jaoks eraldi alamkaust ja mudel
 MODEL_CONFIGS = {
     "print": "models/qwen3.5-ocr-print-base-r64-mi-vl-20260828",
-    "hand":  "models/qwen3.5-ocr-kurrent-20260602",
+    "hand":  "models/qwen3.5-ocr-kurrent-20260829",
 }
 
 #: Mootor tüübi kaupa: "unsloth" (kohapeal GPU-l) või "llamacpp" (HTTP server).
