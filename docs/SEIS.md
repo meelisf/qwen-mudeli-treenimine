@@ -476,10 +476,14 @@ ei tööta, kuni need üles pannakse. Nõuab sudot.
 
 ### 6.5 Mis jääb pärast jooksu tegemata
 
-- **GGUF-konversioon.** Käsikirjapool jookseb llama.cpp all
-  (`llama-server-hand`, port 8081), seega uus adapter tuleb merge'ida,
-  konverteerida, kvantida ja unit-faili tee uuendada — SPIKKER, „llama.cpp
-  mõlema mudeli all".
+- ~~**GGUF-konversioon.**~~ **TEHTUD 31.08 02:40** —
+  `models/gguf/kurrent-20260829-Q8_0.gguf` + `mmproj-kurrent-20260829-F16.gguf`,
+  mõõdetud pariteedis (§6.4). **Tegemata on ainult unit-faili tee uuendus**
+  (`llama-server-hand.service`) ja `MODEL_CONFIGS["hand"]` — SPIKKER,
+  „llama.cpp mõlema mudeli all". Nõuab sudot.
+- **Loobituvastus on nüüd mõõdetud vajadus, mitte teoreetiline.** Kaks lehte
+  loobivad uue mudeliga ka Q8_0-l ja üks kõigis viies jooksus — treening seda
+  ei paranda (§6.4).
 - **Teenus saadab käsikirjamudelile `INSTRUCTION`-i, mitte
   `KURRENT_INSTRUCTION`-it** (`kataloogi-jalgimine-ja-ocr.py:265`
   `get_instruction()`). See on **teadlik**, mitte unustatud: hoiti nii, et
