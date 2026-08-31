@@ -147,29 +147,43 @@ Ahela kirjeldus ja logid: `docs/kurrent-20260829-oine-ahel.md`.
 
 ---
 
-## 8. Järelmõõtmine 31.08: holdout on pime VUTT-i päris materjalile
+## 8. Järelmõõtmine 31.08: VUTT-i päris leht ja juhise küsimus
 
 Ajend: kasutaja võrdles VUTT-i lehte `crx9xb/1` („kirjad Kambjast",
 herrnhutlaste eestlastest vendade kiri) vana ja uue mudeliga.
 
-**Uus mudel loeb sõnu paremini** — vana andis „mit meiner *hohen* darinnen
-leben" ja „Mein *hohes* verlangt", uus loeb õigesti „Herzen"/„Herze"; samuti
-„dich" (mitte „das"), „Wunden" (mitte „Munden"), „Gemeine" (mitte
-„Gemeinde", 7×), „sie" (mitte „Sir"). **Aga kaotab transkriptsioonitava:**
-käsikirjas on läbivalt `u.` (15×), uus mudel kirjutab kõigil 15 korral
-„und" — mõlema juhisega, ehk see on mudel, mitte juhis. Uus eksis ka
-pealkirjas („Edo" pro „Lodo", kasutaja kinnitatud).
+### Uus mudel loeb sisu selgelt paremini
 
-Põhjus on treeningkorpuses, mitte mudelis:
-
-| allikas | lehti | `u.` | `und` |
+| kohas | vana | uus | käsikirjas |
 |---|---|---|---|
-| kurrent_xix (47 % korpusest) | 8000 | 327 | 46 297 |
-| senatsprotokolle | 229 | 235 | 448 |
-| **KOKKU** | **17 045** | **570** | **50 870** (98,9 %) |
+| „mit meinem … darinnen leben" | *hohen* | **Herzen** | Herzen |
+| „Mein … verlangt" | *hohes* | **Herze** | Herze |
+| „Ich grüße … recht sehr" | das | **dich** | dich |
+| „Blut u. …" | Munden | **Wunden** | Wunden |
+| „küße …" | Sir. | **sie** | Sie |
+| „… lieben br. Leonhard" | die | **den** | den |
+| kogudus (7×) | Gemeinde | **Gemeine** | Gemeine |
 
-### Juhise parandamine EI ole põhjendatud — mõõdetud
+Vana mudeli „mit meiner *hohen* darinnen leben" ja „Mein *hohes* verlangt"
+on mõttetud; uus loeb sealt „Herzen"/„Herze". „Gemeine" on ka herrnhutlaste
+õige termin. **Sisu poolest võidab uus mudel selgelt.**
 
+Uue vead samal lehel: pealkirjas „Edo" pro **„Lodo"** (kasutaja kinnitatud).
+Mõlemad jätsid transkribeerimata kohanime **„Cambij"** paremal ülal ja lugesid
+allkirja „Kangro" → „Rangro".
+
+**`u.` vs „und" EI OLE viga.** Uus mudel kirjutab käsikirja `u.` asemel
+läbivalt „und" (15/15), vana säilitas lühendi. Esialgu tundus see
+regressioonina, aga **kasutaja (31.08): lühend võib olla nii või naa, sisu on
+tähtis.** Transkriptsioonitava seda ei fikseeri, seega see ei lähe arvesse.
+(Taustaks: treeningkorpus on 98,9 % „und" — 570 `u.` vs 50 870; `kurrent_xix`
+üksi 327 vs 46 297. Mudel kaldub „und" poole korpuse, mitte vea tõttu.)
+
+### Juhise parandamine on MÕÕDETUD ja tagasi lükatud
+
+Kambja lehel kirjutas `INSTRUCTION` nimisõnad väikese algustähega („kind",
+„gemeine", „blut"), `KURRENT_INSTRUCTION` hoidis suurtähed. See tundus
+põhjusena teenuse juhis lõpuks ära parandada. **Holdout ei kinnita seda.**
 `eval_kurrent.py --prompt print` vs vaikimisi, sama 73 lehte, sama server:
 
 | | CER | sõnaalguliste suurtähtede osakaal | `u.` osakaal |
@@ -178,21 +192,16 @@ Põhjus on treeningkorpuses, mitte mudelis:
 | `KURRENT_INSTRUCTION` | 7,6 % | 19,8 % | 3,3 % |
 | `INSTRUCTION` (teenuse oma) | **7,5 %** | **19,7 %** | 3,3 % |
 
-**Juhised on holdoutil eristamatud.** Kambja lehe suur vahe (14 vs 2
-suurtähelist nimisõna) on n=1 ja väljaspool domeeni. `get_instruction()`
-jääb muutmata — mitte enam „et mootorivahetus jääks ainsaks muutujaks",
-vaid **sest muutmiseks pole tõendit**.
+**Eristamatud.** Kambja lehe vahe on n=1 ja väljaspool domeeni — juhis mõjub
+seal, kus mudel on kõige ebakindlam. `get_instruction()` jääb muutmata: põhjus
+ei ole enam „et mootorivahetus jääks ainsaks muutujaks", vaid **et muutmiseks
+pole tõendit**. See lahtine ots on nüüd suletud.
 
-### Mida see holdouti kohta ütleb
+### Holdout ei sisalda VUTT-i päris žanre
 
-Holdoutil **ei ole ühtki lehte, kus `u.` domineeriks** (esineb 20 lehel 73-st,
-üheski mitte ülekaalus). Kambja leht on 100 % `u.`, mudel andis 0 % — ja
-holdout ei suuda seda viga näidata. Sama kehtib XVII saj ladina Kurrendi
-kohta (vt `kurrent-korpuse-keeleline-auk`).
-
-**Järeldus: §1–3 numbrid on ausad arhiivikorpuste kohta ja ei ütle midagi
-selle kohta, mida VUTT päriselt teeb.** Enne järgmist treeningut tuleks
-holdouti lisada VUTT-i päris materjali — vähemalt Kambja-tüüpi kirjad ja
-XVII saj Tartu protokollid —, muidu jääb iga järgmine jooks samasse
-pimenurka. `u.` ise laheneb töövoos: leht on „Toores", inimene parandab,
-järgmine treening näeb lühendit.
+Kambja kirjad (herrnhutlaste eestikeelse kogukonna saksa kirjavahetus) ja
+XVII saj Tartu ladina protokollid ei ole korpuses esindatud — vt
+`kurrent-korpuse-keeleline-auk`. §1–3 numbrid kehtivad **arhiivikorpuste**
+kohta; VUTT-i kasulikkuse kohta need midagi ei ütle. Enne järgmist treeningut
+tasub holdouti lisada päris VUTT-i materjali, muidu jääb iga järgmine jooks
+sama nurga taha.
