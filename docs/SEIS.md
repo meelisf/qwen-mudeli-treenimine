@@ -179,7 +179,8 @@ kombinatsioon 8 127. **Kärbet ei ole, `max_seq_length` ei vaja tõstmist.**
 - „`<cs>` regressioon holdoutil (16 → 11)" → 147 lehe peal 166 → 160, müra.
 - „`print-base-r64` näeb marginaali paremini" → §2.3, nägemine ei ole telg.
 - „Teenuse juhise parandamine (`INSTRUCTION` → `KURRENT_INSTRUCTION`) on tasuta
-  võit, tee eraldi sammuna" → **mõõdetud 31.08 ja tagasi lükatud**, §3.3.
+  võit" → **CER-i võitu EI OLE** (mõõdetud 31.08, 0,1 pp). Juhis on siiski
+  01.09 mudelipõhiseks tehtud — selguse, mitte täpsuse pärast, §3.3.
 - „Uus Kurrendi mudel kaotab lühendi `u.`, see on regressioon" → **ei ole
   viga**, kasutaja otsus 31.08: lühend võib olla nii või naa, sisu on tähtis.
 - „Tokenivaru on 50" → tegelik 343 (193 lipuga).
@@ -226,11 +227,10 @@ tõsiseltvõetav regressioon. Hüpotees (KONTROLLIMATA): andmestikku ei
 tasakaalustatud, rootsi ametkonnamaterjali mass kasvas. Enne midagi ette
 võtta: vaata neid 9 lehte silmaga.
 
-### 3.3 Teenuse juhise küsimus on SULETUD
+### 3.3 Teenuse juhis on nüüd sama, millega treeniti (01.09)
 
-Teenus saadab käsikirjamudelile `INSTRUCTION`-i, mitte `KURRENT_INSTRUCTION`-it
-(`get_instruction()`). Aastaid seisis märkmetes, et see on „tasuta võit, tee
-eraldi sammuna". **Mõõdetud 31.08, sama 73 lehte, sama server:**
+Kuni 01.09.2026 saatis teenus käsikirjamudelile `INSTRUCTION`-i, mitte
+`KURRENT_INSTRUCTION`-it. **Mõõdetud 31.08, sama 73 lehte, sama server:**
 
 | | CER | sõnaalguliste suurtähtede osakaal | `u.` osakaal |
 |---|---|---|---|
@@ -238,8 +238,21 @@ eraldi sammuna". **Mõõdetud 31.08, sama 73 lehte, sama server:**
 | `KURRENT_INSTRUCTION` | 7,6 % | 19,8 % | 3,3 % |
 | `INSTRUCTION` (teenuse oma) | 7,5 % | 19,7 % | 3,3 % |
 
-**Eristamatud.** `get_instruction()` jääb muutmata — põhjus ei ole enam
-ettevaatus, vaid **tõendi puudumine**.
+**CER-is eristamatud** — juhise vahetamine ei ole kvaliteedivõit ja seda ei
+tohi sellisena esitleda. **Muudetud siiski 01.09 kasutaja otsusega, ja põhjus ei
+ole CER:** juhis oli treeningus sees kogu aeg, seega on ta osa mudeli
+sisendjaotusest. Teistsuguse juhisega päring on definitsiooni järgi jaotusest
+väljas, ka siis kui 73 lehte seda juhuslikult välja ei too. Peale selle tekitasid
+kaks lahknevat konfiguratsiooni (teenus üht juhist, `eval_kurrent.py` vaikimisi
+teist) segadust: mõõdetud seis ei olnud kunagi see, mis tootmises jooksis.
+
+Teenuses on nüüd `INSTRUCTIONS = {"print": INSTRUCTION, "hand":
+KURRENT_INSTRUCTION}`; `get_instruction()` ja `get_chat_template()` võtavad
+tüübi. **Nähtav muutus väljundis:** reavahetuse sidekriips `-` → `¬` (VUTT-i
+käsikirjakokkulepe, `KURRENT_INSTRUCTION` p 3) ja käsikirjaväljundis ei ole enam
+XML-märgendeid isegi juhuslikult — trükijuhis neid nõuab, Kurrendi oma keelab.
+Sondeeritud `data/test/hand/1689-2_lk004.jpg` peal, mõlemad juhised sama serveri
+vastu.
 
 ### 3.4 Holdout ei sisalda VUTT-i päris žanre
 

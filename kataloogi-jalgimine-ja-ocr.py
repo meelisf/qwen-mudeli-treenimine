@@ -33,7 +33,7 @@ from transformers import StoppingCriteria
 from unsloth import FastVisionModel
 from natsort import natsorted
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "scripts"))
-from prompt import INSTRUCTION
+from prompt import INSTRUCTION, KURRENT_INSTRUCTION
 from imaging import MAX_PIXELS, fit_to_grid
 from loop_detect import is_looped
 
@@ -262,28 +262,30 @@ def ensure_model(model_type: str):
 
 # --- 3. ABIFUNKTSIOONID ---
 
+#: Juhis materjalitüübi kaupa – iga mudel saab SELLE juhise, millega ta on
+#: treenitud. Trükimudel: `INSTRUCTION` (VUTT XML). Kurrendi mudel:
+#: `KURRENT_INSTRUCTION` (puhas tekst, `¬` sidekriips, XML sõnaselgelt keelatud)
+#: – vt scripts/train_kurrent.py.
+#:
+#: Kuni 01.09.2026 saatis teenus MÕLEMALE tüübile `INSTRUCTION`-i, kuigi
+#: käsikirjamudel oli treenitud `KURRENT_INSTRUCTION`-iga; kogu Kurrendi
+#: hindamine (scripts/eval_kurrent.py vaikimisi) tehti seevastu
+#: KURRENT_INSTRUCTION-iga. Lahknevus on nüüd kaotatud: teenus ja hindamine
+#: kasutavad sama juhist.
+INSTRUCTIONS = {
+    "print": INSTRUCTION,
+    "hand":  KURRENT_INSTRUCTION,
+}
+
+
 def get_instruction(model_type: str) -> str:
-    """Juhis materjalitüübi kaupa.
-
-    HOIATUS – teadaolev lahknevus, mida EI TOHI koos mootorivahetusega parandada:
-    teenus on algusest saati saatnud MÕLEMALE tüübile `INSTRUCTION`-i, kuigi
-    käsikirjamudel on treenitud `KURRENT_INSTRUCTION`-iga. Kogu Kurrendi
-    pariteedimõõtmine (docs/arhiiv/llamacpp-juurdlus-20260827.md) tehti seevastu
-    KURRENT_INSTRUCTION-iga, ehk mõõdetud konfiguratsioon ei ole see, mida
-    teenus praegu kasutab.
-
-    Siin hoitakse tahtlikult PRAEGUST käitumist, et mootorivahetus jääks ainsaks
-    muutujaks. Vahe tuleb enne juhise parandamist ära mõõta:
-        venv/bin/python scripts/eval_kurrent.py --prompt print <mudel>
-    ja võrrelda vaikimisi (kurrent) jooksuga.
-    """
-    return INSTRUCTION
+    return INSTRUCTIONS[model_type]
 
 
-def get_chat_template():
+def get_chat_template(model_type: str):
     return tokenizer.apply_chat_template(
         [{"role": "user", "content": [
-            {"type": "text", "text": INSTRUCTION},
+            {"type": "text", "text": get_instruction(model_type)},
             {"type": "image"},
         ]}],
         add_generation_prompt=True, tokenize=False,
@@ -616,7 +618,7 @@ def process_batch_http(batch_items, model_type):
         logger.info(f"Transkribeeritud: {os.path.basename(txt_out_path)}")
 
 
-def process_batch(batch_items):
+def process_batch(batch_items, model_type):
     """
     Töötleb ühe batchi pilte.
     batch_items: list tuple'itest (pildi_täistee, txt_väljundi_täistee)
@@ -643,7 +645,7 @@ def process_batch(batch_items):
         return
 
     try:
-        chat_template = get_chat_template()
+        chat_template = get_chat_template(model_type)
         inputs = tokenizer(
             images_pil,
             [chat_template] * len(images_pil),
@@ -762,7 +764,7 @@ def main_loop():
                     if ENGINE_CONFIGS.get(mt) == "llamacpp":
                         process_batch_http(batch, mt)
                     else:
-                        process_batch(batch)
+                        process_batch(batch, mt)
                     gc.collect()
             logger.info("Kõik hetke tööd tehtud. Ootan uusi...")
             last_heartbeat = time.time()

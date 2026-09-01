@@ -529,9 +529,8 @@ sudo systemctl disable --now llama-server-print llama-server-hand
 ```
 
 **Kaks teadaolevat lahtist otsa:**
-1. Teenus saadab käsikirjamudelile `INSTRUCTION`-i, mitte `KURRENT_INSTRUCTION`-it.
-   Mõõdetud mõju **0,1 pp** – parandus on tasuta võit, aga tehke see ERALDI
-   sammuna, et mootorivahetus jääks ainsaks muutujaks.
+1. ~~Teenus saadab käsikirjamudelile `INSTRUCTION`-i~~ – **tehtud 01.09.2026.**
+   Iga mudel saab nüüd oma treeningjuhise (`INSTRUCTIONS` dict teenuses).
 2. Reedese treeningu järel tuleb käsikirjamudel uuesti konverteerida ja
    `llama-server-hand.service` tee uuendada:
    ```bash
@@ -560,10 +559,14 @@ MODEL_CONFIGS = {
 Pärast muutmist `sudo systemctl restart ocr-service`. Tagasi keeramine =
 sama rida vana teega, teenus taaskäivitada.
 
-**NB!** Teenus saadab käsikirjamudelile `INSTRUCTION`-i (trüki/markup juhis),
-kuigi mudel on treenitud `KURRENT_INSTRUCTION`-iga. See on olnud nii algusest
-peale. Mõõda see ära enne kui parandad:
-`scripts/eval_kurrent.py --prompt print` annab sama 73 lehte teise juhisega.
+**Juhis käib mudeliga kaasa** (alates 01.09.2026). Teenuses on
+`INSTRUCTIONS = {"print": INSTRUCTION, "hand": KURRENT_INSTRUCTION}`; iga mudel
+saab selle juhise, millega ta treeniti. Kuni 01.09 sai ka käsikirjamudel
+trükijuhise – CER-is oli vahe 0,1 pp (eristamatu), aga väljundivorm erineb
+nähtavalt: trükijuhisega tuleb reavahetuse sidekriipsuks `-`, treeningjuhisega
+`¬` nagu VUTT-is kokku lepitud. Kui vahetad `MODEL_CONFIGS`-is mudeli teistsuguse
+juhisega treenitu vastu, uuenda ka `INSTRUCTIONS`.
+Võrdlus kahe juhise vahel: `scripts/eval_kurrent.py --prompt print`.
 
 ---
 
