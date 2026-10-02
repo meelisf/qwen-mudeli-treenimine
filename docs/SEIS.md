@@ -424,5 +424,13 @@ ei tohi mälu järgi tsiteerida.
    kirjutatakse vaikselt tervena.
 10. **`reocr_vutt.py` transformersi backend + nimekirja külmutamine.**
 
+11. **Treeningmaterjali kvaliteedikontroll (Kurrent).** Leitud 02.10: sama pilt
+    eri ID-de ja eri GT-ga, osa GT-st rämps-HTR (`bullinger_autoren`, vt §3.4c
+    „Holdouti kontroll"). Automaatselt saab leida KANDIDAADID, otsus jääb
+    inimesele: (a) pildiräsi → vastuolulised GT-d (odav, kohe tehtav);
+    (b) sõnade kehtivus / tähe-n-grammi skoor → rämps-GT (odav, CPU);
+    (c) mudel üle treeningkomplekti, kõrge CER GT vastu = raske leht VÕI vale
+    GT → ülevaatusjärjekord (~8 h GPU, alles pärast treeningut).
+
 Punktid 5, 7, 9, 10 pärinevad
 `docs/arhiiv/treening-ja-inferentsi-koodi-ulevaade-20260828.md`-st.
