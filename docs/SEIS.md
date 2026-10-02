@@ -291,12 +291,32 @@ Põhjus ja audit: `docs/kurrent-andmestikud.md` „Ülevaatus 2026-10-02".
 - Treeninguks: `train_kurrent.py` ilma muudatusteta; ~11 % rohkem näiteid →
   ~40 h 2 epohhiga.
 
+### 3.4c Treening 02.10.2026 — kolm muudatust retseptis
+
+Võrreldes 29.08 jooksuga muutus lisaks andmestikule (§3.4b) kolm asja.
+Puhast A/B-d ei tehtud, sest üks jooks võtab ~35–40 h:
+
+1. **`train_on_responses_only`.** Juhis (375 tokenit, identne igas näites)
+   oli 47 % kaotokenitest. Kontrollitud collatoriga: treenitav osa on nüüd
+   `<think>\n\n</think>\n\n` + transkriptsioon + `<|im_end|>`.
+   **Kadu ei ole 29.08 numbriga (0,132) võrreldav**, võrdle holdouti CER-i.
+2. **Üle 8192 tokeni näited välja** (2 koenigsfelden_adhr lehte, kuni 15 754
+   tokenit). Pikkuse hinnang on tegelikust +16 tokenit (kontrollitud 6 näitel).
+3. **Baas bf16, mitte 4-bit** (`--16bit`). Mõõdetud `--test`-iga 20 PIKIMA
+   näite peal (6 987–7 737 tokenit): 4-bit 19,7 GB / 160 s, **bf16 28,0 GB /
+   129 s** (−19 %). Kaart 32 GB, varu ~3,5 GB. Põhjus: adapter õpib nüüd sama
+   baasi peale, millele ta tootmises (bf16 → Q8_0) pannakse.
+
+LoRA r=64/alpha=64 jäi: vead on tähekuju-lugemisvead, mitte mahupiirang
+(arutelu 02.10).
+
 ### 3.5 Retsept, kui vaja korrata
 
-`venv/bin/python scripts/train_kurrent.py` **ilma lippudeta** — vaikeväärtused
+`venv/bin/python scripts/train_kurrent.py --16bit` (alates 02.10; 29.08 jooks oli
+ilma lippudeta, 4-bit) — muud vaikeväärtused
 on õiged (baas `unsloth/Qwen3.5-9B`, r=64). `--test` peab näitama:
 `Lähtepunkt: unsloth/Qwen3.5-9B`, `LoRA rank: 64`, `Holdout: 133`,
-`Andmestik: 18775` (andmestik v2, 02.10.2026; enne `Holdout: 73`, `Andmestik: 16971`). Kui ei näita — **peatu**.
+`Andmestik: 18773` + `Baasi laadimine: bf16` (andmestik v2, 02.10.2026, 2 liiga pikka välja; enne `Holdout: 73`, `Andmestik: 16971`). Kui ei näita — **peatu**.
 
 Checkpointimine: `save_steps=250` (~2 h), `save_total_limit=3`, iga epohhi lõpus
 rotatsioonist väljas `epohh-N-adapter/`. `--resume` leiab viimase checkpointi ise

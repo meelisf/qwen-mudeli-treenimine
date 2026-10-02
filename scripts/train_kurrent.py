@@ -28,11 +28,18 @@ Käivitamine:
   python scripts/train_kurrent.py --test    # kiirtest, 5 sammu, ei salvestata
   python scripts/train_kurrent.py --base models/muu-checkpoint
   python scripts/train_kurrent.py --resume    # jätka viimasest checkpointist
+  python scripts/train_kurrent.py --16bit     # baas bf16-na, mitte 4-bitisena (QLoRA)
+
+Muudatused 2026-10-02 (andmestik v2):
+  - kadu ainult vastusel (train_on_responses_only); juhis oli 47 % kaotokenitest
+  - näited, mis ei mahu MAX_SEQ sisse, jäetakse välja (koenigsfelden 2 lk)
+  - --test võtab PIKIMAD näited, et tipumälu oleks halvima juhu oma
 """
 
 import os
 import sys
 import csv
+import math
 import torch
 from datetime import datetime
 from pathlib import Path
@@ -58,6 +65,9 @@ if TEST_MODE:
 BASE_MODEL = "unsloth/Qwen3.5-9B"   # vt docstring: 20260602 retsept
 LORA_RANK = 64                      # r=16 ei mahuta 17k lk mitmesajandilist korpust
 CUSTOM_STEPS = -1  # -1 = täisepohh
+LOAD_4BIT = "--16bit" not in sys.argv  # 4-bit = QLoRA; --16bit = baas bf16
+MAX_SEQ = 8192
+MAX_PIXELS = 5_120_000
 SAVE_STEPS = 250   # ~1,9 h (27,9 s/samm); checkpoint 1,2 GB, alles hoitakse 3
 RESUME_FROM = None # --resume (viimane) või --resume=<tee checkpointini>
 
@@ -146,14 +156,16 @@ if not torch.cuda.is_available():
 
 model, tokenizer = FastVisionModel.from_pretrained(
     model_name=BASE_MODEL,
-    load_in_4bit=True,
+    load_in_4bit=LOAD_4BIT,
     use_gradient_checkpointing="unsloth",
 )
 
 tokenizer.truncation = False
 
+print(f"Baasi laadimine: {'4-bit (QLoRA)' if LOAD_4BIT else 'bf16'}")
+
 tokenizer.image_processor.size = {
-    "longest_edge": 5_120_000,
+    "longest_edge": MAX_PIXELS,
     "shortest_edge": tokenizer.image_processor.size.get("shortest_edge", 65536),
 }
 print(f"Pildi max_pixels: {tokenizer.image_processor.size['longest_edge']:,} px "
@@ -196,12 +208,33 @@ def _load_holdout(path):
     return holdout
 
 
+_JUHIS_TOKENEID = len(tokenizer.tokenizer(KURRENT_INSTRUCTION)["input_ids"])
+_MALLI_VARU = 32  # chat template'i tokenid + tühi <think>-plokk
+
+
+def _pilditokenid(img_path):
+    """Visuaaltokenite arv Qwen smart_resize järgi (tegur 32 = patch 16 x merge 2)."""
+    w, h = PILImage.open(img_path).size
+    f = 32
+    hb, wb = max(f, round(h / f) * f), max(f, round(w / f) * f)
+    if hb * wb > MAX_PIXELS:
+        b = math.sqrt(h * w / MAX_PIXELS)
+        hb, wb = math.floor(h / b / f) * f, math.floor(w / b / f) * f
+    return hb * wb // (f * f)
+
+
+def hinnanguline_pikkus(img_path, tekst):
+    return (_pilditokenid(img_path) + _JUHIS_TOKENEID + _MALLI_VARU
+            + len(tokenizer.tokenizer(tekst)["input_ids"]))
+
+
 class KurrentAndmestik:
     def __init__(self, csv_path, images_dir):
         self.samples = []
         skipped = 0
         holdout = _load_holdout(HOLDOUT_PATH)
         held = 0
+        liiga_pikk = 0
 
         with open(csv_path, encoding="utf-8", newline="") as f:
             for row in csv.DictReader(f):
@@ -216,9 +249,14 @@ class KurrentAndmestik:
                 if not os.path.exists(img_path):
                     skipped += 1
                     continue
+                pikkus = hinnanguline_pikkus(img_path, t.strip())
+                if pikkus > MAX_SEQ:
+                    liiga_pikk += 1
+                    continue
                 self.samples.append({
                     "img": img_path,
                     "txt": t.strip(),
+                    "pikkus": pikkus,
                 })
 
         if skipped:
@@ -229,6 +267,14 @@ class KurrentAndmestik:
             print(f"  Holdout: nimekirja ei leitud ({HOLDOUT_PATH}) – treenin kõige peal")
         else:
             print("  Holdout: --no-holdout, treenin kõige peal")
+        if liiga_pikk:
+            print(f"  Üle {MAX_SEQ} tokeni: {liiga_pikk} näidet välja jäetud")
+        if TEST_MODE:
+            # Pikimad ette: 5 sammu x grad_acc 4 = 20 näidet halvimast otsast,
+            # et tipumälu ja sammu aeg oleksid halvima juhu omad.
+            self.samples.sort(key=lambda s: -s["pikkus"])
+            self.samples = self.samples[:20]
+            print(f"  TEST: 20 pikimat näidet, {self.samples[-1]['pikkus']}–{self.samples[0]['pikkus']} tokenit")
         print(f"  Andmestik: {len(self.samples)} näidet")
 
     def __len__(self):
@@ -273,9 +319,15 @@ trainer = SFTTrainer(
     model=model,
     tokenizer=tokenizer,
     train_dataset=dataset,
-    data_collator=UnslothVisionDataCollator(model, tokenizer, resize="max", max_seq_length=8192),
+    data_collator=UnslothVisionDataCollator(
+        model, tokenizer, resize="max", max_seq_length=MAX_SEQ,
+        # Kadu ainult vastusel: juhis on igas näites identne (375 tokenit)
+        train_on_responses_only=True,
+        instruction_part="<|im_start|>user\n",
+        response_part="<|im_start|>assistant\n",
+    ),
     args=SFTConfig(
-        max_length=8192,
+        max_length=MAX_SEQ,
         per_device_train_batch_size=1,
         gradient_accumulation_steps=4 if TEST_MODE else 8,
         warmup_steps=2 if TEST_MODE else 80,
@@ -325,7 +377,10 @@ if not TEST_MODE:
     print(f"Katkemise korral jätkamine: venv/bin/python scripts/train_kurrent.py --resume")
 
 print("Alustan treeningut...")
+torch.cuda.reset_peak_memory_stats()
 trainer_stats = trainer.train(resume_from_checkpoint=RESUME_FROM)
+print(f"GPU tipumälu: {torch.cuda.max_memory_reserved() / 1024**3:.1f} GB reserved, "
+      f"{torch.cuda.max_memory_allocated() / 1024**3:.1f} GB allocated")
 print(f"Treening lõppenud! Aeg: {round(trainer_stats.metrics['train_runtime'] / 60, 2)} min")
 
 # ---------------------------------------------------------------------------
