@@ -212,6 +212,69 @@ Järeldused:
 - Järgmisel ehitusel **piira Zürichi osakaalu ja võta mitte-MM projektid
   eraldi** — praegune voogedastus ei jõua nendeni kunagi.
 
+### kurrent_xix mitte-Zürichi audit (2026-10-02, täielik)
+
+Alla laaditud kõik 121 mitte-`MM_` projekti (73 GB, HF cache). Skript
+`scripts/xix_audit.py` → `data/kurrent_xix_audit/`:
+`pages.csv` (lehe kaupa: read, aastad, teksti- ja pildiräsi), `projects.csv`,
+`dups.txt` (projektipaarid jagatud lehtedega), `samples/` (2 pisipilti/projekt),
+**`unique_pages.csv` = dedup'itud, transkribeeritud lehtede kanooniline loend**.
+
+**Dedup:** union-find kolme võtmega — teksti räsi (normaliseeritud, ≥ 5 rida),
+pildi räsi, Transkribuse pageId (failinime viimane osa). Esindajaks `TRAIN_`
+eelistatult, siis kõige rohkem ridu.
+
+| | lehti |
+|---|---|
+| kõik read 121 projektis | 30 676 |
+| unikaalseid lehti | 22 483 |
+| **unikaalseid transkribeeritud (≥ 5 rida)** | **11 249** |
+
+Duplikaate on massiliselt: `Haeckermann_3+` = `Konzilsprotokolle_A_Haeckermann_3`
+(1 921 ühist), mõlemad ⊃ `Konzilsprotokolle_M4_HTR+` (1 655), `Todesurteile`
+kaks varianti (768), `Konzilsprotkolle_B_Schwartz` ≈ `Schwartz_M6` (526),
+Hoftheater variandid, Nekrolog ×4, Pyl M1–M5 kattuvad ahelana. `TEST_` ja
+`TRAINING_TESTSET_` on enamasti `TRAIN_`-i alamhulgad.
+
+**Perioodid** (projekti aasta nimest, muidu tekstis mainitud aastate mediaan;
+`parthey` ja `semper_20_MS` parandatud käsitsi — vt allpool):
+
+| periood | lk | peamised |
+|---|---|---|
+| **1750–99** | **2 566** | Haeckermann/Konzilsprotokolle 1 921 + 87 (Greifswaldi ülikooli konsiilium 1775–1811), Schwartz 542 + 14 (1755–86) |
+| 1800–49 | 2 545 | Todesurteile 1849– 803, OEAW 460 (1847–49), Hoftheater 1806 286, Pyl 393, parthey 278, Müller 97, hufeland 52, nn_msgermqu 84 |
+| 1850–99 | 4 606 | **Escher 3 819** (kirjad 1843–77), semper 260, Todesurteile 237, Gusbeth 114, Bassermann 106 |
+| 1900+ | 1 429 | Roland 1941, Steiner, Nekrolog, Estonian Knighthood 1905–15, Kochbuch 1930ndad, Arnold 1940 |
+| ? | 103 | Barlaam, Suppes, MargareteSick |
+
+**Peamine leid: 18. sajandi saksa Kurrenti avalik GT ON olemas** — ~2 500 lehte
+ülikooli konsiiliumi protokolle (Greifswald 1775–1811, Schwartz 1755–86),
+täpselt Tartu ülikooli materjali žanr. Varasem väide („XVIII saj saksa
+Kurrenti avalikke treeningandmeid ei eksisteeri", `docs/arhiiv/kurrent-strateegia.md`)
+**ei kehti** — andmed olid kurrent_xix-is, aga voogedastus ei jõudnud nendeni.
+
+Silmaga kontrollitud (näidised `samples/`):
+- `Haeckermann_3+`: Greifswald, 5. aprill 1796, rektori ja professorite
+  protokoll — akadeemiline kantseleikurrent, mitu kätt.
+- `parthey`: Humboldti „Kosmose" loengute konspekt (Gay-Lussac, Quito) ≈ 1827–28,
+  **ladina kirjas, mitte Kurrendis**. Tekstis mainitud aastad (mediaan 1783)
+  eksitavad → periood käsitsi 1800–49.
+- `semper_20_MS`: Gottfried Semper, 1850ndad; tekstiaastate mediaan 1761
+  eksitav → käsitsi 1850–99.
+- `Escher_M1`: Alfred Escheri kirjad (nt 21.08.1867), kiire isiklik käsi —
+  just see mitmekesisus, mis Zürichi puhtandist puudub. NB: 13 538 lehest
+  ainult 3 819 transkribeeritud.
+
+**Järeldused järgmiseks Kurrendi treeninguks:**
+- Uut 1750–1899 materjali on ~9 700 unikaalset lehte, eri kätest. See on
+  suurem panus kui kogu hanse-xvii, ja just mitmekesisuse poolest.
+- `Escher` (3 819) ja Zürich (8 000) kalduvad domineerima — piira
+  projekti kohta (nt 500–1000).
+- 1900+ (1 429) võib välja jätta või hoida väikesena — VUTT-il seda materjali
+  peaaegu ei ole.
+- Ehitusskript peab lugema `unique_pages.csv`-d (projekt + failinimi), mitte
+  voogedastama andmestikku järjekorras.
+
 ### fgho/hanse-kurrent-xvii-rawxml — UUS (2026-07-09), alla laaditud
 
 `~/.cache/huggingface/hub/datasets--fgho--hanse-kurrent-xvii-rawxml` (10,8 GB,
@@ -233,8 +296,9 @@ eksemplaris) — eri käed, sama tekst; pigem pluss kui duplikaat.
   liiga vara.
 - Riksarkivet `goteborgs_poliskammare_fore_1900`, `frihetstidens_utskottshandlingar`
   (mitte-`_seg`): laadimisskriptiga, maht teadmata — kontrollida, kas kannab teksti.
-- **XVIII saj saksa Kurrenti avalikku lehetasemel GT-d ei ole endiselt.**
-  Selle augu täidab realistlikult ainult VUTT-i oma „Valmis" käsikirjamaterjal.
+- XVIII saj saksa Kurrent: vt kurrent_xix audit ülal — ~2 500 lehte
+  ülikooli konsiiliumi protokolle (Greifswald, Schwartz). VUTT-i oma „Valmis"
+  käsikirjamaterjal jääb siiski ainsaks Baltikumi-spetsiifiliseks allikaks.
 
 ---
 
