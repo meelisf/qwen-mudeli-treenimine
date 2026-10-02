@@ -320,6 +320,26 @@ Puhast A/B-d ei tehtud, sest üks jooks võtab ~35–40 h:
 LoRA r=64/alpha=64 jäi: vead on tähekuju-lugemisvead, mitte mahupiirang
 (arutelu 02.10).
 
+**Holdouti kontroll (02.10, enne võrdlust loe):** vanad 73 on uues
+`holdout.txt`-is alles, GT-tekst ja pilt baithaaval identsed vana andmestikuga
+(`~/_kustutamiseks_20261002/data_kurrent_vana_17044/`). Vana mudeli väljundid:
+`data/kurrent/eval/kurrent-20260829-Q8_0/`. Teksti duplikaate holdout↔treening
+ei ole. **Pildi duplikaate on 3, kõik vanade 73 seas ja olid ka 29.08
+treeningus** (leke oli mõlemas jooksus ühesugune):
+
+- `11771_bullinger_au_1209460_0002_49174186.jpg` — sama pilt treeningus 6×
+  (11741/46/50/60/66/76), eri transkriptsioonidega
+- `16441_aaeb_xiv_xvi_3680035_0013_76516926.jpg` — 3× (15236, 16375, 16515)
+- `15464_aaeb_xiv_xvi_1627450_0002_60945177.jpg` — 1× (16494)
+
+**Aus võrdlus = 70 lehte**, need 3 mõlemast välja. Uued 60 on puhtad; vana
+mudel tuleb nende peal eraldi läbi lasta.
+
+**Kõrvalleid, `bullinger_autoren`:** sama pilt esineb eri ID-dega mitu korda ja
+eri GT-ga, üks neist rämps-HTR (`11766`: „lo illis oii m coditit detit…").
+Kandidaat §3.2 bullingeri regressiooni seletuseks — kontrollimata, kui
+laialt see allikas levib.
+
 ### 3.5 Retsept, kui vaja korrata
 
 `venv/bin/python scripts/train_kurrent.py --16bit` (alates 02.10; 29.08 jooks oli
