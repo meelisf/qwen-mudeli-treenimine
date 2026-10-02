@@ -342,7 +342,7 @@ laialt see allikas levib.
 
 ### 3.5 Retsept, kui vaja korrata
 
-`venv/bin/python scripts/train_kurrent.py --16bit` (alates 02.10; 29.08 jooks oli
+`PYTHONUNBUFFERED=1 venv/bin/python scripts/train_kurrent.py --16bit` (alates 02.10; ilma PYTHONUNBUFFERED-ita jääb `| tee` logis loss puhvrisse; 29.08 jooks oli
 ilma lippudeta, 4-bit) — muud vaikeväärtused
 on õiged (baas `unsloth/Qwen3.5-9B`, r=64). `--test` peab näitama:
 `Lähtepunkt: unsloth/Qwen3.5-9B`, `LoRA rank: 64`, `Holdout: 133`,
