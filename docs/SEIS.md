@@ -304,8 +304,18 @@ Puhast A/B-d ei tehtud, sest üks jooks võtab ~35–40 h:
    tokenit). Pikkuse hinnang on tegelikust +16 tokenit (kontrollitud 6 näitel).
 3. **Baas bf16, mitte 4-bit** (`--16bit`). Mõõdetud `--test`-iga 20 PIKIMA
    näite peal (6 987–7 737 tokenit): 4-bit 19,7 GB / 160 s, **bf16 28,0 GB /
-   129 s** (−19 %). Kaart 32 GB, varu ~3,5 GB. Põhjus: adapter õpib nüüd sama
-   baasi peale, millele ta tootmises (bf16 → Q8_0) pannakse.
+   129 s** (−19 %). Kaart 32 GB.
+   **Päris jooksus kiirusevõitu EI OLE:** 32,7 s/samm vs 29.08 4-bit
+   30,8 s/samm, ETA ~42 h. −19 % kehtis ainult pikimatel näidetel.
+   nvidia-smi näitab jooksu ajal 30,9 / 32,6 GB — varu ~1,7 GB, OOM-i korral
+   `--resume --16bit`.
+   **Ainus põhjus** on treeningu ja inferentsi kooskõla: QLoRA adapter õpib
+   osaliselt kompenseerima NF4 kvantiseerimisviga, mida tootmise bf16 → Q8_0
+   baasis ei ole. Oodatav võit on VÄIKE (QLoRA artikkel: NF4 ≈ 16-bit LoRA).
+   Ainus otsene vihje: testis sama 20 näite ja seemnega oli bf16 kadu igal
+   5 sammul 0,07–0,15 madalam (1,66 vs 1,76) — 5 sammu, mitte tõend.
+   Kui see jooks ei ole 29.08-st parem, ei tea me, kas süü on andmetel või
+   siin — kolm muudatust korraga on teadlik kompromiss.
 
 LoRA r=64/alpha=64 jäi: vead on tähekuju-lugemisvead, mitte mahupiirang
 (arutelu 02.10).
