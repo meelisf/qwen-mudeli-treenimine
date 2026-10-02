@@ -431,6 +431,8 @@ ei tohi mälu järgi tsiteerida.
     (b) sõnade kehtivus / tähe-n-grammi skoor → rämps-GT (odav, CPU);
     (c) mudel üle treeningkomplekti, kõrge CER GT vastu = raske leht VÕI vale
     GT → ülevaatusjärjekord (~8 h GPU, alles pärast treeningut).
+    **Kasutaja valik 02.10: tee (c)** — eesmärk ei ole ideaalne GT, vaid
+    vigaste ja täiesti kontrollimata lehtede väljafiltreerimine.
 
 Punktid 5, 7, 9, 10 pärinevad
 `docs/arhiiv/treening-ja-inferentsi-koodi-ulevaade-20260828.md`-st.
