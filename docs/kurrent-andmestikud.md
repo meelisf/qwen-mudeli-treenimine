@@ -170,6 +170,74 @@ Kõik andmestikud on töödeldud `data/kurrent/` formaati: JPEG pildid + `metada
 
 ---
 
+## Ülevaatus 2026-10-02: mis on uut ja mis jäi kasutamata
+
+Taust: VUTT-i võrdlus (VUTT repo `docs/reviews/2026-10-02-htr-mudelite-vordlus.md`)
+näitas, et `kurrent-20260829` loeb selget kätt Gemini 3.8 Flashiga samal
+tasemel, aga isiklikke ja õpetlaste käsi (nt Morgensterni XIX saj algus)
+oluliselt kehvemini.
+
+### kurrent_xix = AINULT Zürichi valitsusprotokollid
+
+`build_kurrent_dataset.py` voogedastab andmestikku shard'ide järjekorras ja
+lõpetab 8000 lehe juures (250 lk/projekt). Esimesed projektid on `MM_1_001…`:
+**kõik meie 8000 kurrent_xix lehte on 33 köidet Zürichi Regierungsratsprotokolle
+(1803–1883)** — üks arhiivisari, puhtand, kantseleikäsi, 47 % kogu korpusest.
+Kontrollitud: failinimede eesliited `083605…083661` = `MM_1_001…MM_1_033`
+(HF rows-API: offset 0 = `MM_1_001`, `083605_…`).
+
+Andmestikus on praegu 321 projekti / 144 533 lk (muudetud viimati 2026-04-25,
+ainult duplikaat-shard'ide kustutamine). Kasutamata on 121 mitte-Zürichi
+projekti (~78 GB): READ/CITlab Kurrendi GT (`TRAIN_CITlab_*`, `TEST_CITlab_*`,
+`TRAINING_TESTSET_*`) + `hufeland_privatbesitz_1829`, `nn_msgermqu2124_1827`,
+`nn_msgermqu2345_1827`, `parthey`, `semper_20_MS`.
+
+Pisteline kontroll (alla laaditud `~/.cache/huggingface/hub/datasets--dh-unibe--image-text_kurrent-xix`):
+
+| projekt | lk | read/lk | märkus |
+|---|---|---|---|
+| `TRAIN_CITlab_GrimmBriefe` | 7 | 20 | 1830–40ndad, Grimmide kirjad — õige tüüp, aga tilluke |
+| `TRAIN_CITlab_Tagebuch_Arnold_v1` | 89 | 20 | **1940ndad** (II maailmasõda), mitte XIX saj |
+| `TRAIN_CITlab_Minutes_of_Estonian_Knighthood` | 130 | 60 | **1900–1915**, kalligraafiline puhtand, kahelehelised laotused |
+| `nn_msgermqu2124_1827` | 175 | mediaan 0 | 115/175 lehte < 5 rea — **valdavalt transkribeerimata** |
+| `parthey` | 801 | mediaan 0 | 523/801 lehte < 5 rea — **valdavalt transkribeerimata** |
+
+Järeldused:
+- Nimi „xix" ei taga perioodi — iga projekt tuleb enne kasutamist dateerida.
+- Paljud projektid on duplikaadid: `TRAIN_`/`TEST_`/`TRAINING_TESTSET_` on sama
+  projekti eri jaotused; `Lotte1` = `Lotte_Tagebuecher` = `Lottes_Schrift`
+  (kõik 613 MB), `Haeckermann_3+` = `Konzilsprotokolle_A_Haeckermann_3`,
+  kaks `Protokoll_Hoftheater_1806-Vers_2018Nov` varianti. Dedup sisu järgi.
+- Tühjad lehed (< `MIN_LINES`) filtreerib build-skript juba välja.
+- Järgmisel ehitusel **piira Zürichi osakaalu ja võta mitte-MM projektid
+  eraldi** — praegune voogedastus ei jõua nendeni kunagi.
+
+### fgho/hanse-kurrent-xvii-rawxml — UUS (2026-07-09), alla laaditud
+
+`~/.cache/huggingface/hub/datasets--fgho--hanse-kurrent-xvii-rawxml` (10,8 GB,
+35 parquet-faili). **1 298 lk**, neist 12 < 5 rea. Dekaadid: 1600ndad 277,
+1610ndad 629, 1620ndad 272, 1660ndad 120. Alamsaksa linnapäevade retsessid
+(Lübecki, Kölni, Braunschweigi jt arhiivid), 19–44 rida lehel. Poolitus `¬`
+(sama mis `KURRENT_INSTRUCTION`). Ladina sõnad antiikvas keset Kurrenti
+(„Recesses", „deliberation", „contributionibus") — sama code-switching nagu
+VUTT-i materjalis. Sama kuju kui `hanse_kurrent_xvi`, seega `build_hanse_dataset.py`
+peaks sobima (andmestiku nimi on skriptis kõvakoodis, rida ~115).
+NB: mitu retsessi on sama koosoleku eri arhiivide koopiad (nt 1669 viies
+eksemplaris) — eri käed, sama tekst; pigem pluss kui duplikaat.
+
+### Teised kandidaadid
+
+- Zenodo 15303398 Dresdner Hofdiarium 1653–56: 12 lk, CC BY 4.0, ei ole veel
+  kasutusel (meil 1665 ja 1673). `build_dresdner_dataset.py`.
+- `fgho/hanse-kurrent-xv` (429 lk, XV saj) ja dh-unibe XIV–XVI saj kogud —
+  liiga vara.
+- Riksarkivet `goteborgs_poliskammare_fore_1900`, `frihetstidens_utskottshandlingar`
+  (mitte-`_seg`): laadimisskriptiga, maht teadmata — kontrollida, kas kannab teksti.
+- **XVIII saj saksa Kurrenti avalikku lehetasemel GT-d ei ole endiselt.**
+  Selle augu täidab realistlikult ainult VUTT-i oma „Valmis" käsikirjamaterjal.
+
+---
+
 ## Vaadatud aga mitte kasutusel
 
 | Andmestik | Põhjus |
