@@ -17,10 +17,28 @@
 
 - GPU TDP: 575W
 - Vaikimisi power limit: 575W
-- **Treeninguks seatud limiit: 450W** (`sudo nvidia-smi -pl 450`)
+- **Seatud limiit: 450W** — alaliselt, ka inferentsi ajal
   - Põhjus: ~8h treeningutel sustained 559W tekitas muret kaablite/PSU kohta
   - 450W on konservatiivne ja ohutu valik
-- Power limit lähtestub rebooti peal (persistence mode väljas)
+- Persistence mode on sees (`nvidia-persistenced`, enabled)
+
+## Võimsuspiiride püsivus (alates 02.10.2026)
+
+Kuni 02.10.2026 seati piirid käsitsi ja need lähtestusid rebooti peal.
+Nüüd seab need stardil systemd-üksus **`loss-voimsuspiirid.service`**
+(koopia `systemd/loss-voimsuspiirid.service`), mis käivitub enne
+`ocr-service`-it ja llama-servereid:
+
+- GPU: `nvidia-smi -pl 450`
+- CPU: turbo väljas (`echo 1 > /sys/devices/system/cpu/intel_pstate/no_turbo`)
+
+CPU RAPL PL1/PL2 = 65/219 W on i7-14700F tehase vaikeväärtused, mitte meie
+piirang; turbo väljas olles PL2 ei rakendu. Treeningule CPU-piirang ei loe
+(`dataloader_num_workers=0`, töö on GPU-l).
+
+Kontroll: `nvidia-smi --query-gpu=power.limit --format=csv` → 450 W;
+`cat /sys/devices/system/cpu/intel_pstate/no_turbo` → 1.
+Muutmine: muuda üksust `/etc/systemd/system/`-is JA koopiat repos.
 
 ## Süsteemi kogutarbimine treeningu ajal
 

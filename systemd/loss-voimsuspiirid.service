@@ -1,0 +1,13 @@
+[Unit]
+Description=LOSS võimsuspiirid: GPU 450 W, CPU turbo väljas (vt qwen3.5/docs/masina-parameetrid.md)
+After=nvidia-persistenced.service
+Before=ocr-service.service llama-server-print.service llama-server-hand.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/bin/nvidia-smi -pl 450
+ExecStart=/bin/sh -c "echo 1 > /sys/devices/system/cpu/intel_pstate/no_turbo"
+
+[Install]
+WantedBy=multi-user.target
