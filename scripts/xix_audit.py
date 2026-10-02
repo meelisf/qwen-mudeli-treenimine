@@ -6,7 +6,7 @@ Väljund:
   data/kurrent_xix_audit/dups.txt      — duplikaatgrupid (teksti- ja pildiräsi järgi)
   data/kurrent_xix_audit/samples/      — 2 näidispilti projekti kohta (pisipilt)
 """
-import collections, csv, glob, hashlib, io, os, re, statistics, sys
+import collections, csv, glob, hashlib, io, os, re, statistics
 import pyarrow.parquet as pq
 from PIL import Image
 

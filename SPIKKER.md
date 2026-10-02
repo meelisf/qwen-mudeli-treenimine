@@ -360,8 +360,8 @@ Testjooksu väljundis PEAB seisma täpselt see:
 ```
 Lähtepunkt:    unsloth/Qwen3.5-9B
 LoRA rank: 64
-  Holdout: 73 lehte treeningust välja (data/kurrent/holdout.txt)
-  Andmestik: 16971 näidet
+  Holdout: 133 lehte treeningust välja (data/kurrent/holdout.txt)
+  Andmestik: 18775 näidet
 ```
 
 Kui lähtepunkt on mõni `models/...` või rank 16 – **peatu**, vaikeväärtused on
@@ -619,7 +619,7 @@ sudo systemctl start ocr-service
 | `data/lehekyljed/` | 1500 lk, Kreeka + ladina, puhas tekst | etapp 1 treening |
 | `data/processed/` | 136 lk, käsitsi märgendatud, markup | markup treening |
 | `data/vutt/` | VUTT Valmis lehed, markup | markup treening |
-| `data/kurrent/` | 17 044 lk käsikirja, 13 allikat + `vutt_horedad` | Kurrent treening |
+| `data/kurrent/` | 18 908 lk käsikirja (v2, 02.10.2026), `scripts/build_kurrent_v2.py` | Kurrent treening |
 | `data/kurrent/holdout.txt` | 73 lk, treeningust väljas | mudelite võrdlus |
 | `~/vutt-backups/latest/data` | VUTT backup-snapshot (öine cron) | lähteandmed |
 

@@ -59,7 +59,8 @@ adapterist Q8_0-ni võtab ~2,5 min. 29.08 koristati nii 103 GB (`models/` 160 �
 56 GB). LoRA adapterid (`models/qwen3.5-ocr-*`, ~300 MB tk) on tõeallikas ja
 jäävad alati.
 
-Praegu kettal vaheastmeid ~35 GB (`kurrent-20260829` omad) — võib kustutada.
+02.10.2026: vaheastmed, kõik `checkpoints-*` ja `markup-20260722` GGUF tõsteti
+`~/_kustutamiseks_20261002/` alla (kustutab kasutaja).
 `models/checkpoints-*` (~9 GB) on treeningu jätkamispunktid, lõppadapterid on
 neist eraldi; suuresti surnud kaal, kustutamine on eraldi otsus.
 
@@ -271,12 +272,31 @@ Vana diagnoos on siin endiselt elus ja nüüd kinnitust saanud: **herrnhutlaste
 lühendisüsteem ja eesti kohanimed saksa kujul** on mudelile võõrad. Vt
 `docs/arhiiv/kurrent-strateegia.md` ja mälu `kurrent-korpuse-keeleline-auk`.
 
+### 3.4b Andmestik v2 (02.10.2026) — järgmise treeningu sisend
+
+`data/kurrent/` on ümber ehitatud (`scripts/build_kurrent_v2.py`), **18 908 rida**:
+vana 17 044-st jäi 10 044 (Zürich 8 000 → 1 000), lisandus 7 571 dedup'itud
+kurrent_xix mitte-Zürichi lehte (sh **2 566 XVIII saj saksa**, Greifswaldi
+konsiilium) ja 1 292 `hanse_kurrent_xvii`. `vutt_horedad` 27 (värskeim VUTT).
+Põhjus ja audit: `docs/kurrent-andmestikud.md` „Ülevaatus 2026-10-02".
+
+- Uued allikanimed: `kurrent_xix_zurich` (endine `kurrent_xix`),
+  `xix_read_1750_99/1800_49/1850_99/1900/dateerimata`, `hanse_kurrent_xvii`.
+  Vanad allikata read (aaeb, jonkopings) said sildi. Täpne projekt:
+  `data/kurrent/projektid.csv`.
+- **Holdout 133** = vanad 73 MUUTMATA (vana↔uue mudeli võrdlus) + 10 iga uue
+  allika kohta. Vana mudeli võrdluseks filtreeri eval vanade 73 peale.
+- Vana andmestik ja ehitamise lähteandmed (HF cache) on
+  `~/_kustutamiseks_20261002/` all — kustutab kasutaja.
+- Treeninguks: `train_kurrent.py` ilma muudatusteta; ~11 % rohkem näiteid →
+  ~40 h 2 epohhiga.
+
 ### 3.5 Retsept, kui vaja korrata
 
 `venv/bin/python scripts/train_kurrent.py` **ilma lippudeta** — vaikeväärtused
 on õiged (baas `unsloth/Qwen3.5-9B`, r=64). `--test` peab näitama:
-`Lähtepunkt: unsloth/Qwen3.5-9B`, `LoRA rank: 64`, `Holdout: 73`,
-`Andmestik: 16971`. Kui ei näita — **peatu**.
+`Lähtepunkt: unsloth/Qwen3.5-9B`, `LoRA rank: 64`, `Holdout: 133`,
+`Andmestik: 18775` (andmestik v2, 02.10.2026; enne `Holdout: 73`, `Andmestik: 16971`). Kui ei näita — **peatu**.
 
 Checkpointimine: `save_steps=250` (~2 h), `save_total_limit=3`, iga epohhi lõpus
 rotatsioonist väljas `epohh-N-adapter/`. `--resume` leiab viimase checkpointi ise

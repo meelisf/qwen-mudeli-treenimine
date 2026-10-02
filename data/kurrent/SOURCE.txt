@@ -6,3 +6,7 @@ lehti: 17  (--type hand, --append allikas=vutt_horedad)
 raw_dir: /home/mf/vutt-backups/snapshots/20260826T194357Z/data
 ehitatud: 2026-08-26T22:44:17
 lehti: 9  (--type hand, --append allikas=vutt_horedad)
+
+ehitatud: 2026-10-02T14:43:48  scripts/build_kurrent_v2.py
+read: 18907  Zürich 8000→1000  Escher≤1000  1900+≤50/projekt  + hanse_kurrent_xvii
+vutt_horedad: lisatud 1 leht snapshot 20261002T001501Z-st (kokku 27)

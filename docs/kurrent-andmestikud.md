@@ -275,6 +275,16 @@ Silmaga kontrollitud (näidised `samples/`):
 - Ehitusskript peab lugema `unique_pages.csv`-d (projekt + failinimi), mitte
   voogedastama andmestikku järjekorras.
 
+### Ehitatud: andmestik v2 (2026-10-02)
+
+`scripts/build_kurrent_v2.py` → `data/kurrent/` (vana kaust prügikastis).
+Zürich ≤ 1 000 (holdout-lehed alati sees), Escher ≤ 1 000, 1900+ ≤ 50/projekt,
+ülejäänud `unique_pages.csv` lehed kõik, hanse-xvii kõik; MIN_LINES nagu vanadel
+skriptidel (xix 5, hanse 3), tekst samadest `parse_pagexml`-idest. Seed 3407.
+Kontrollitud: 18 908 unikaalset faili, 0 vigast pilti, 0 orbu, 0 tühja teksti,
+133 holdout-rida kõik CSV-s. Hõredaid (≤ 200 märki) 581 — VUTT-i 27
+tühja/hõredat lehte piisab, hõreduse äratundmine on lihtne õppida.
+
 ### fgho/hanse-kurrent-xvii-rawxml — UUS (2026-07-09), alla laaditud
 
 `~/.cache/huggingface/hub/datasets--fgho--hanse-kurrent-xvii-rawxml` (10,8 GB,
