@@ -9,13 +9,14 @@
   - Escheri kõik puhtad lehed: data/escher_lisa
   - dresdner_1665 asendatakse data/dresdner_v2-ga (õige pb piir, tabeliga
     lehed välja); holdout-lehe tekst võetakse v2-st, tabelileht kukub välja
+  - holdout: + Geusau 10 ja Kosmos 10 (iga käsikiri korra), vt lisa_holdout
   - AUDIT: iga AUDITID-faili treeningrida, millel ≥ LAVI tühja TextLine'i,
     läheb välja — ka holdout'ist (katkine GT ei sobi ka mõõtmiseks)
 Pildid hardlink-itud. Sisendkaustu ei muudeta.
 Käivitus: venv/bin/python scripts/build_kurrent_v4.py [--dry-run] [--uuesti]
   --uuesti: olemasolev data/kurrent_v4 kustutatakse (ainult lingid + CSV)
 """
-import csv, os, re, shutil, sys
+import csv, os, random, re, shutil, sys
 from collections import Counter, defaultdict
 from datetime import datetime
 from pathlib import Path
@@ -30,6 +31,8 @@ DTA2 = Path("data/dta_lisa")
 NEW = Path("data/kurrent_v4")
 DTA_XIX = {"parthey", "hufeland_privatbesitz_1829", "nn_msgermqu2124_1827", "nn_msgermqu2345_1827"}
 LAVI = 2
+HO_SEED, HO_MIN_CHARS = 3407, 200               # = make_holdout.py
+HO_GEUSAU, HO_KOSMOS = 10, 10
 A = Path("data/kurrent_xix_audit")
 AUDITID = [A / "tuhjad_read_kaug.csv",          # AAEB, Königsfelden (Bullinger: holdout)
            A / "tuhjad_read_riksarkivet.csv",   # 7 Riksarkiveti allikat
@@ -67,6 +70,27 @@ def katkised(gt_ridu):
         if e >= LAVI:
             out[name] = e
     return out
+
+
+def lisa_holdout(out, proj):
+    """Uued DTA allikad holdout'i (kasutaja 04.10): muidu ei mõõdeta just neid
+    käsi, mis on VUTT-ile lähimad. Geusau HO_GEUSAU lk; Kosmos HO_KOSMOS lk, iga
+    käsikiri vähemalt korra. Seed ja min_chars nagu make_holdout.py-s."""
+    rng = random.Random(HO_SEED)
+    sobib = [r for r in out if len(r[1]) >= HO_MIN_CHARS]
+    geusau = sorted(r[0] for r in sobib if r[2] == "dta_geusau_1740")
+    valik = rng.sample(geusau, HO_GEUSAU)
+    kosmos = defaultdict(list)
+    for r in sobib:
+        if r[2] == "dta_kosmos_1827":
+            kosmos[proj[r[0]]].append(r[0])
+    kasikirjad = sorted(kosmos)
+    for k in kasikirjad:                       # iga käsi korra
+        valik.append(rng.choice(sorted(kosmos[k])))
+    jaak = sorted(f for k in kasikirjad for f in kosmos[k] if f not in valik)
+    valik += rng.sample(jaak, HO_KOSMOS - len(kasikirjad))
+    allikas = {r[0]: r[2] for r in out}
+    return [(allikas[f], f) for f in valik]
 
 
 def main():
@@ -117,10 +141,12 @@ def main():
             assert r[0] not in src, r[0]
             out.append(r); src[r[0]] = d; proj[r[0]] = p[r[0]]
             st[nimi] += 1
+    ho_uued = lisa_holdout(out, proj)
     print(f"v3 {len(base)} → v4 {len(out)}")
     for k, v in sorted(st.items()):
         print(f"  {k}: {v}")
     print(f"holdout −{len(ho_valja)}: {sorted(ho_valja)}")
+    print(f"holdout +{len(ho_uued)} DTA: {Counter(proj[f] for _, f in ho_uued)}")
     print(Counter(r[2] for r in out).most_common())
     if DRY:
         return
@@ -137,10 +163,12 @@ def main():
             f.write(f"# v4: eemaldatud {len(ho_valja)} lehte (auditi ≥{LAVI} tühja rida / Dresdneri tabel)\n")
         f.writelines(l for l in ho_read
                      if not (l.strip() and not l.startswith("#") and os.path.basename(l.strip().split("\t")[-1]) in ho_valja))
+        f.write(f"# v4: lisatud {len(ho_uued)} DTA lehte (Geusau {HO_GEUSAU}, Kosmos {HO_KOSMOS}; seed {HO_SEED})\n")
+        f.writelines(f"{a}\t{fn}\n" for a, fn in ho_uued)
     (NEW / "SOURCE.txt").write_text(
         (BASE / "SOURCE.txt").read_text(encoding="utf-8")
         + f"\nehitatud: {datetime.now():%Y-%m-%dT%H:%M:%S}  scripts/build_kurrent_v4.py\n"
-        f"v3 {len(base)} → {len(out)}  {dict(st)}  holdout −{len(ho_valja)}\n", encoding="utf-8")
+        f"v3 {len(base)} → {len(out)}  {dict(st)}  holdout −{len(ho_valja)} +{len(ho_uued)}\n", encoding="utf-8")
     print(f"valmis: {NEW}")
 
 

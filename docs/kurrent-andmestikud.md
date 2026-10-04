@@ -462,12 +462,14 @@ xix_read_1850_99 1 287, hanse_xvi 1 144, svea 847, trolldom 742, bullinger 709,
 krigshovratt 343, senats 229, dresdner 166, dateerimata 101, jonkopings 57,
 bergskollegium_adv 53, gota 51, koenigsfelden 31, vutt_horedad 27, zurich 1.
 
-**Holdout 133 → 110** (v3 −5, v4 −18: Zürich 10, Bullinger 7, Dresdneri tabel 1).
-Treeninguks 18 863. NB: holdout'is EI OLE DTA-lehti (Kosmos, Geusau, Sanders) —
-neid ei mõõdeta, kuni holdout'i ei laiendata.
+**Holdout 133 → 130**: v3 −5, v4 −18 (Zürich 10, Bullinger 7, Dresdneri tabel 1),
+**+20 DTA** (kasutaja 04.10: muidu ei mõõdeta just VUTT-ile lähimaid käsi):
+Geusau 10 + Kosmos 10, iga 9 käsikirja vähemalt korra (`lisa_holdout`, seed 3407,
+≥ 200 märki nagu `make_holdout.py`). Treeninguks **18 843**.
+Vana↔uue mudeli võrdluseks: vanad 73 miinus 10 Zürichi = 63 lehte.
 
 Kontrollitud: 18 973 unikaalset failinime, 0 puuduvat pilti, 0 tühja teksti,
-110/110 holdout-rida CSV-s.
+130/130 holdout-rida CSV-s.
 
 ### Tootmismudel ja ridade vahelejätmine (PARANDATUD)
 

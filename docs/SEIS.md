@@ -351,12 +351,12 @@ GT-kontrolli kandidaadid, 0–1-ga 3–5 %. GT-kontroll üksi seda ei püüa
 (Zürich: CER 0,5 %, mudel õppis samad read vahele jätma) → kõik allikad
 auditeeritud XML-i tasemel; Dresdneri vana TEI-ehitaja oli eraldi katki.
 
-**`data/kurrent_v4/` = 18 973 rida** (treeninguks 18 863): v2 − osalise GT-ga
+**`data/kurrent_v4/` = 18 973 rida** (treeninguks 18 843): v2 − osalise GT-ga
 lehed (xix 1 684, Zürich 999, Bullinger, Trolldom 19, Königsfelden 3);
 Bullinger 1 837 → 709 (parim XML-versioon); Dresdner 241 → 166 (uus ehitaja);
 +2 463 DTA Kosmos-Nachschriften (9 kätt 1827–29), +707 Geusau reisipäevik 1740,
 +386 Sandersi kirjad (DTA TEI täistekst); Escher 201 → 768.
-**Holdout 133 → 110**; DTA-lehti holdout'is ei ole. Detailid, auditi tabel ja
+**Holdout 133 → 130**: −23 katkist, +20 DTA (Geusau 10, Kosmos 10). Detailid, auditi tabel ja
 skriptid: `docs/kurrent-andmestikud.md` „Ülevaatus 2026-10-04".
 
 Parandus: ridade vahelejätmine EI tulnud alles v2-ga — 29.08 andmestikus oli
@@ -386,11 +386,13 @@ taastamine järgmises iteratsioonis.
    uuesti ehitatavad. `data/dta_tei/*.xml` JÄÄB (TEI vahemälu, 9 MB).
 4. **Uued lehed läbi sama mudeli:** `venv/bin/python scripts/gt_kontroll.py --paralleel 3`
    — jätkab tüve järgi, st teeb ainult `dta_*`, `esch_*`, `blv3_*`, `dresdner1665_*` (~5 000 lk, ~7 h).
+   NB: gt_kontroll jätab holdout'i vahele → 20 DTA holdout-lehte vaata silmaga
+   (`build_dta_kosmos.py --naita <id> <nr>` vs pilt).
    Siin sõelu AINULT struktuurselt (väljund GT-st > 1,3× pikem, loop, GT algab
    keset lehte) — mudel ei ole neid käsi näinud, kõrge CER ei tõenda GT viga.
 5. Kandidaadid (2 + 4) välja `data/kurrent/metadata.csv`-st (skript on veel
    kirjutamata; holdout jääb puutumata), dokumenteeri `kurrent-andmestikud.md`-sse.
-6. `venv/bin/python scripts/train_kurrent.py --test --16bit` → rida `Andmestik:` = ridu miinus holdout 110.
+6. `venv/bin/python scripts/train_kurrent.py --test --16bit` → rida `Andmestik:` = ridu miinus holdout 130 (18 843).
 7. Treening v4-ga nädalavahetusel 10.–11.10 (retsept §3.5; OCR-teenus maas, teavita kasutajaid).
    `~/_kustutamiseks_20261002/hf_cache/` kustutada alles pärast treeningut.
 
