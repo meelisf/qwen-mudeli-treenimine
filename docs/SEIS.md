@@ -360,6 +360,35 @@ Tootmismudel: ridade vahelejätmine vanadel 73 holdout-lehel viik
 (plaan: nädalavahetus 10.–11.10), enne seda GT-kontrolli tulemuste
 läbivaatus ja uute lehtede struktuurne sõelumine.
 
+**Kontrollnimekiri: kohe kui GT-kontroll on valmis (~05.10 17:00)**
+
+1. Jooks lõppenud? `tail logs/gt-kontroll-20261004-1535.log`
+   (viimane rida `[18775/18775]`), siis `venv/bin/python scripts/gt_kontroll.py --aruanne`.
+2. Kandidaadid allikate kaupa üle (`--naita <tüvi>`, paar näidet allika kohta):
+   GT viga vs raske käsi. v2-st pärit lehti on mudel treeningus näinud →
+   CER ≥ 10 % on tugev GT-vea märk, aga ära viska tervet allikat silmaga
+   vaatamata välja.
+3. **Vahetus** (enne seda EI tohi `data/kurrent`-i puutuda — jooks loeb seda):
+   ```bash
+   K=~/_kustutamiseks_20261005; mkdir -p $K
+   mv data/kurrent $K/data_kurrent_v2          # vabaneb ~5 GB (v4-st välja jäänud lehed)
+   mv data/kurrent_v4 data/kurrent
+   # tööriistade väljundid kaasa — gt_kontroll jätkab tüve järgi, eval/oesel loevad siit
+   mv $K/data_kurrent_v2/{gt_kontroll,eval,oesel} data/kurrent/
+   rm -rf data/kurrent_v3 data/bullinger_v3 data/dta_kosmos data/escher_lisa data/dta_tei/img
+   ```
+   Vahekaustad on ainult CSV-d + hardlinkid (kokku ~40 MB) ja skriptidega
+   uuesti ehitatavad. `data/dta_tei/*.xml` JÄÄB (TEI vahemälu, 9 MB).
+4. **Uued lehed läbi sama mudeli:** `venv/bin/python scripts/gt_kontroll.py --paralleel 3`
+   — jätkab tüve järgi, st teeb ainult `dta_*`, `esch_*`, `blv3_*` (~3 700 lk, ~5 h).
+   Siin sõelu AINULT struktuurselt (väljund GT-st > 1,3× pikem, loop, GT algab
+   keset lehte) — mudel ei ole neid käsi näinud, kõrge CER ei tõenda GT viga.
+5. Kandidaadid (2 + 4) välja `data/kurrent/metadata.csv`-st (skript on veel
+   kirjutamata; holdout jääb puutumata), dokumenteeri `kurrent-andmestikud.md`-sse.
+6. `venv/bin/python scripts/train_kurrent.py --test --16bit` → rida `Andmestik:` = ridu miinus holdout 128.
+7. Treening v4-ga nädalavahetusel 10.–11.10 (retsept §3.5; OCR-teenus maas, teavita kasutajaid).
+   `~/_kustutamiseks_20261002/hf_cache/` kustutada alles pärast treeningut.
+
 ### 3.5 Retsept, kui vaja korrata
 
 `PYTHONUNBUFFERED=1 venv/bin/python scripts/train_kurrent.py --16bit` (alates 02.10; ilma PYTHONUNBUFFERED-ita jääb `| tee` logis loss puhvrisse; 29.08 jooks oli
