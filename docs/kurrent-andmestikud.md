@@ -310,6 +310,137 @@ eksemplaris) — eri käed, sama tekst; pigem pluss kui duplikaat.
   ülikooli konsiiliumi protokolle (Greifswald, Schwartz). VUTT-i oma „Valmis"
   käsikirjamaterjal jääb siiski ainsaks Baltikumi-spetsiifiliseks allikaks.
 
+## Ülevaatus 2026-10-04: osaline GT ja andmestik v4
+
+Taust: GT kiirkontroll (SEIS §6.11 tee c, `scripts/gt_kontroll.py`, mudel
+`kurrent-20261002` üle treeningkomplekti) näitas kandidaatide koondumist kahte
+allikasse: Escher (50 % lehtedest) ja `bullinger_autoren` (30 %). Silmaga
+kontrollitud: GT-st puuduvad read, mis pildil on olemas (nt Escher 4505: 7 rida
+20-st), ja mudel on ridade vahelejätmist juba õppinud (17717, 7005).
+
+### Põhjus: tühjad TextLine'id jäetakse vaikselt vahele
+
+`build_kurrent_dataset.parse_pagexml` jätab teksti(ta) TextLine'i vahele
+(`if uc is None or not uc.text: continue`). Pilt näitab rida, GT-s seda pole.
+
+Kust tühjad read tulevad:
+- **CITlabi „Matcher"** (`<Creator>`-is `Matcher(net_0.sprnn…)`): editsioonitekst
+  on automaatselt joondatud tuvastatud ridadele; kus joondus ebaõnnestus, jäi
+  rida tühjaks. Matcher-projektid: Escher, `semper_20_MS`, `Pyl_M3–M5`,
+  `parthey`, `hufeland_privatbesitz_1829`, `nn_msgermqu2124/2345`.
+- **Bullinger**: 80 % treeningulehtedest ≥ 2 tühja rida (Transkribus);
+  lisaks on **sama fail HF-andmestikus mitmes versioonis eri XML-iga** —
+  voogedastus võttis esimese, 100 lehel oli täielikum versioon olemas.
+- AAEB, Hanse XVI/XVII, Königsfelden: praktiliselt puhtad.
+
+Mõõdik: `scripts/tuhjad_read_audit.py` → `data/kurrent_xix_audit/tuhjad_read.csv`
+(xix + hanse, kohalik HF cache) ja `--kaug` → `tuhjad_read_kaug.csv`
+(Bullinger, AAEB, Königsfelden otse HF-ist, ainult `xml_content` veerg —
+pilte ei laadita). Veerud: allikas, projekt, failinimi, ridu, tühje, looja,
+`treeningus` (andmestiku failinimi).
+
+**Lävi on mõõdetud, mitte valitud.** GT-kontrolli kandidaatide osakaal
+(normaliseeritud CER ≥ 10 % mudelil, mis on neid lehti treeningus näinud):
+
+| tühje TextLine'e | xix: kandidaate | Escher | Bullinger (õige versioon) |
+|---|---|---|---|
+| 0 | 5 % | 1/8 | 11 % (0–1 kokku) |
+| 1 | 3 % | 0/13 | |
+| ≥ 2 | **58 %** | **62 %** | **35 %** |
+
+Üksik tühi rida on enamasti müra (tempel, kriips) → lävi **≥ 2 tühja rida = välja**.
+
+### DTA Kosmos-Nachschriften: osalise GT asemel täistekst
+
+Matcheri allikas on Deutsches Textarchiv (DTA). DTA TEI kannab sama käsikirja
+**täielikku lehe teksti**; treenime lehe tasemel, nii et reajoondust ei ole
+vaja. `<pb facs="#fNNNN">` = xix failinime lehenumber (parthey 801 = 801,
+hufeland 172, nn_msgermqu 175/341 — kontrollitud silmaga parthey 673).
+
+Loend: HU Berlin „Nachschriften der Kosmos-Vorträge" (Christian Thomas).
+Kasutusel 9 (CC BY 4.0): `parthey_msgermqu1711_1828`, `hufeland_privatbesitz_1829`,
+`nn_msgermqu2124_1827`, `nn_msgermqu2345_1827` (olid xix-is Matcheriga) +
+**5 uut kätt**: `libelt_hs6623ii_1828`, `patzig_msgermfol841842_1828`,
+`willisen_humboldt_1827`, `nn_oktavgfeo79_1828`, `nn_n0171w1_1828`.
+`riess_f2e1853_1828` on DTAQ-s (kvaliteedikontrollis), avalikult ei saa.
+Lohde ja Stenmark ei ole DTA-s (ainult pildid).
+
+Allalaadimine: TEI `https://www.deutschestextarchiv.de/book/download_xml/<id>`
+(nõuab küpsist `verified=1`), pildid
+`https://media.dwds.de/dta/images/<id>/<id>_<NNNN>_1600px.jpg`.
+Vahemälu `data/dta_tei/` (TEI + `img/`).
+
+TEI → diplomaatiline tekst (`scripts/build_dta_kosmos.py`):
+- `choice` → `abbr` | `orig` | `sic` (MITTE `expan`/`reg`/`corr` — muidu „u̅" → „uund");
+  üksik `expan`/`reg`/`corr`/`supplied` välja
+- `del rendition="#s"` (läbikriipsutus) jääb, `#ow`/`#erased` (ülekirjutatud) välja
+- `add`, `unclear`, `hi`, `fw`, marginaal-`note` jäävad; `note type="editorial"` välja;
+  `metamark` välja
+- `ſ` → `s` (ülejäänud Kurrendi GT-s ſ-i ei ole); rea lõpu `-` jääb nagu DTA-s
+  (korpus on niikuinii segi: `¬` ja `-`)
+- **leht välja**, kui seal on `gap` (loetamatu/kadunud: 246), tabel (21),
+  U+FFFC (esitamatu lühendusmärk: 656, enim Patzig) või < 5 rida (140)
+
+Tulemus: 3 526 lehest **2 463**. Proovida `--naita <id> <nr>`.
+
+### Ehitatud: andmestik v4 (2026-10-04)
+
+Neli sammu, iga samm oma kausta (pildid hardlink'itud, sisend puutumata):
+
+| samm | skript | kaust | lehti |
+|---|---|---|---|
+| v2 miinus ≥ 2 tühja reaga xix-lehed | `build_kurrent_v3.py` | `data/kurrent_v3/` | 18 908 → 17 224 (−1 684) |
+| Bullinger uuesti: parim XML-versioon, ≤ 1 tühi rida | `build_bullinger_v3.py` | `data/bullinger_v3/` | 707 (540 pilti olemas, 169 HF-ist) |
+| DTA Kosmos | `build_dta_kosmos.py` | `data/dta_kosmos/` | 2 463 |
+| Escheri kõik puhtad unikaalsed lehed | `build_escher_lisa.py` | `data/escher_lisa/` | +567 |
+| koondamine | `build_kurrent_v4.py` | **`data/kurrent_v4/`** | **18 983** |
+
+v3-st eemaldatud projekti kaupa: Escher −799, semper −259 (≈ kõik), parthey −184,
+Pyl M3–M5 −313, nn_msgermqu −57, hufeland −23, ülejäänud üksikud.
+v4 koondamisel: vana Bullinger −1 828 (holdout'i 9 jäävad), parthey/hufeland/
+nn_msgermqu Matcheri jäägid −150 (asendab DTA), + Bullinger v3, DTA, Escher.
+
+Escher: kasutaja vaatas pildid üle (04.10) — eri käed, VUTT-ile lähedased;
+v2 Escheri lagi 1 000 kaotati. Unikaalseid transkribeeritud lehti 3 819, neist
+puhtaid (≤ 1 tühi, ≥ 5 rida) 768 — rohkem puhast Escheri ei ole (ülejäänud
+~9 700 toorkirjet on transkribeerimata lehed).
+
+Allikad v4-s (lehti): xix_read_1750_99 2 564, **dta_kosmos_1827 2 463**,
+aaeb 1 982, xix_read_1800_49 1 793, bergskollegium_rel 1 439, hanse_xvii 1 292,
+xix_read_1850_99 1 287, hanse_xvi 1 144, zurich 1 000, svea 847, trolldom 761,
+**bullinger 716**, xix_read_1900 559, krigshovratt 343, dresdner 241, senats 229,
+dateerimata 101, jonkopings 57, bergskollegium_adv 53, gota 51, koenigsfelden 34,
+vutt_horedad 27. Periood 1800–49 kokku ~4 260 (v2: ~1 940).
+
+**Holdout 133 → 128**: 5 lehte olid sama vea all (Pyl, Escher ×2, semper, Dreier)
+ja on eemaldatud ka treeningust. Võrdle mudeleid nende 128 peal.
+
+Kontrollitud: 18 983 unikaalset failinime, 0 puuduvat pilti, 0 tühja teksti,
+128/128 holdout-rida CSV-s.
+
+### Tootmismudel ja ridade vahelejätmine
+
+Ridade vahelejätmise võis tuua alles v2 (29.08 andmestikus Matcheri lehti ei
+olnud). Mõõdetud eval-väljunditest (GT rida ≥ 8 märki, mille parim vaste
+väljundis < 0,6): vanad 73 holdout-lehte — `kurrent-20260829` 29 puuduvat rida
+(15 lehel), `kurrent-20261002` 31 (13 lehel) = **viik, tagasivahetust ei ole
+vaja**. Kõigil 128-l: 177 → 48. Halvim üksikjuhtum 22229 (uus jätab osa lehe
+igast teisest reast vahele).
+
+### Enne treeningut veel lahti
+
+- GT-kontroll (jookseb `data/kurrent`-i peal, lõpp ~05.10 17:00): v2-st pärit
+  lehtedel CER ≥ 10 % = mudel nägi lehte treeningus → tugev GT-vea märk.
+  Vaata iga allika kohta näiteid ENNE hulgi väljaviskamist.
+- Uued lehed (DTA, Escher-lisa, Bullingeri uued versioonid) läbi sama mudeli,
+  aga sõelu AINULT struktuursete tunnuste järgi (väljund GT-st selgelt pikem,
+  loop, GT algab keset lehte) — mudel ei ole neid käsi näinud, kõrge CER ei
+  tõenda GT viga.
+- Vahetus: `data/kurrent_v4` → `data/kurrent` (praegune kaust on GT-kontrolli
+  sisend — mitte enne selle lõppu). `train_kurrent.py` loeb `data/kurrent/`.
+- Toor-XML (`~/_kustutamiseks_20261002/hf_cache/`) **ära kustuta enne uut
+  treeningut** — kõik ehitusskriptid loevad sealt.
+
 ---
 
 ## Vaadatud aga mitte kasutusel
@@ -317,7 +448,7 @@ eksemplaris) — eri käed, sama tekst; pigem pluss kui duplikaat.
 | Andmestik | Põhjus |
 |-----------|--------|
 | [Riksarkivet/frihetstidens_utskottshandlingar_seg](https://huggingface.co/datasets/Riksarkivet/frihetstidens_utskottshandlingar_seg) | Tühjad transkriptsioonid – segmenteeritud aga transkribeerimata |
-| [Zenodo 10.5281/zenodo.17252677](https://zenodo.org/records/17252677) – German Kurrent HTR 9317 rida | Reataseme andmestik (lõigatud read), mitte täisleheküljed; kattub kurrent_xix-ga |
+| [Zenodo 10.5281/zenodo.17252677](https://zenodo.org/records/17252677) – German Kurrent HTR 9317 rida | Reataseme andmestik (lõigatud read), mitte täisleheküljed; kattub kurrent_xix-ga. **04.10:** sama DTA materjal on v4-s lehe tasemel otse DTA TEI-st (vt „Ülevaatus 2026-10-04“) |
 | [Zenodo 10.5281/zenodo.19728926](https://zenodo.org/records/19728926) – BullingerDB 20 898 lk / 376 582 rida | **Binariseeritud** (must-valge) pildid – ei sobi värvilistel skaneeringatel treenitud mudelile; sama Bullinger XVI saj sisu mis meil juba `bullinger_autoren`-is; 99.8 GB allalaadimine; reataseme rekonstrueerimine keeruline. Vt artikkel: arxiv.org/abs/2605.30235 |
 | [aarhus-city-archives/historical-danish-handwriting](https://huggingface.co/datasets/aarhus-city-archives/historical-danish-handwriting) – >11 000 lk, 15.2 GB, CC-BY-4.0 | Taani käsikiri 1841–1939. Tähekujud identsed saksa Kurrentiga, aga: (1) enamus lehekülgi on **ladina kirjas** (Taani loobus Kurrentist ~1875–1885, andmestik ulatub 1939-ni); (2) taani sõnavara treeninguandmetes segab mudeli keelemudelit – võib saksa/rootsi OCR-i halvemaks teha. Kasutatav ainult kui Kurrent-periood (1841–1880) oleks eraldatav. |
 

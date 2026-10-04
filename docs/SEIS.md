@@ -340,6 +340,26 @@ eri GT-ga, üks neist rämps-HTR (`11766`: „lo illis oii m coditit detit…").
 Kandidaat §3.2 bullingeri regressiooni seletuseks — kontrollimata, kui
 laialt see allikas levib.
 
+### 3.4d Andmestik v4 (04.10.2026) — osaline GT välja, DTA ja Escher sisse
+
+GT-kontroll (§6.11 c) leidis, et `parse_pagexml` jätab **tühja TextLine-i
+vaikselt vahele** → GT-st puuduvad pildil olevad read. Allikas: CITlabi
+„Matcher" automaatjoondus (Escher, semper, Pyl, parthey, hufeland,
+nn_msgermqu) ja Bullinger (lisaks mitu XML-versiooni sama faili kohta).
+≥ 2 tühja reaga lehtedest 58 % on GT-kontrolli kandidaadid, 0–1-ga 3–5 %.
+
+**`data/kurrent_v4/` = 18 983 rida**: v2 − 1 684 osalise GT-ga lehte;
+Bullinger 1 837 → 716 (parim XML-versioon, puhas); +2 463 lehte DTA
+Kosmos-Nachschriften (9 kätt 1827–29, täistekst TEI-st, asendab Matcheri
+versiooni); Escher 201 → 768 (kõik puhtad, kasutaja kinnitas pildid).
+Holdout 133 → 128 (5 olid sama vea all). Detailid, mõõtmised ja skriptid:
+`docs/kurrent-andmestikud.md` „Ülevaatus 2026-10-04".
+
+Tootmismudel: ridade vahelejätmine vanadel 73 holdout-lehel viik
+(29 vs 31 rida) → tagasivahetust ei ole vaja. Järgmine treening v4-ga
+(plaan: nädalavahetus 10.–11.10), enne seda GT-kontrolli tulemuste
+läbivaatus ja uute lehtede struktuurne sõelumine.
+
 ### 3.5 Retsept, kui vaja korrata
 
 `PYTHONUNBUFFERED=1 venv/bin/python scripts/train_kurrent.py --16bit` (alates 02.10; ilma PYTHONUNBUFFERED-ita jääb `| tee` logis loss puhvrisse; 29.08 jooks oli
@@ -416,6 +436,7 @@ ei tohi mälu järgi tsiteerida.
    Lahendus: lülitada `LoopStopper` mooduli konstantidele.
    **Nüüd mõõdetud vajadus, mitte teoreetiline** (§3.2).
 6. **`bullinger_autoren` regressioon** (§3.2) — 9 lehte silmaga üle vaadata.
+   **04.10:** põhjus leitud — osaline GT (tühjad TextLine-id + vale XML-versioon), §3.4d.
 7. **`train_on_responses_only` A/B** — praegu treenitakse 813-tokenist juhist
    kaasa; mediaanlehel ~67 % treenitud tokenitest.
 8. **Tühjad/hõredad lehed** — trükikomplektis 0 näidet, juhis lubab
@@ -433,6 +454,9 @@ ei tohi mälu järgi tsiteerida.
     GT → ülevaatusjärjekord (~8 h GPU, alles pärast treeningut).
     **Kasutaja valik 02.10: tee (c)** — eesmärk ei ole ideaalne GT, vaid
     vigaste ja täiesti kontrollimata lehtede väljafiltreerimine.
+    **04.10:** jooks käib (`scripts/gt_kontroll.py`, ~25 h, lõpp ~05.10 17:00).
+    Vahetulemusest leitud süsteemne viga → §3.4d, andmestik v4. Pärast jooksu:
+    allikate kaupa näidised üle, siis kandidaadid v4-st välja.
 
 Punktid 5, 7, 9, 10 pärinevad
 `docs/arhiiv/treening-ja-inferentsi-koodi-ulevaade-20260828.md`-st.
