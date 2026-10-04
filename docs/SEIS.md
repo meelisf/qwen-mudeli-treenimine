@@ -340,25 +340,30 @@ eri GT-ga, üks neist rämps-HTR (`11766`: „lo illis oii m coditit detit…").
 Kandidaat §3.2 bullingeri regressiooni seletuseks — kontrollimata, kui
 laialt see allikas levib.
 
-### 3.4d Andmestik v4 (04.10.2026) — osaline GT välja, DTA ja Escher sisse
+### 3.4d Andmestik v4 (04.10.2026) — iga allikas auditeeritud
 
-GT-kontroll (§6.11 c) leidis, et `parse_pagexml` jätab **tühja TextLine-i
-vaikselt vahele** → GT-st puuduvad pildil olevad read. Allikas: CITlabi
-„Matcher" automaatjoondus (Escher, semper, Pyl, parthey, hufeland,
-nn_msgermqu) ja Bullinger (lisaks mitu XML-versiooni sama faili kohta).
-≥ 2 tühja reaga lehtedest 58 % on GT-kontrolli kandidaadid, 0–1-ga 3–5 %.
+GT-kontroll (§6.11 c) leidis, et PAGE XML-i ehitajad jätavad **tühja
+TextLine-i vaikselt vahele** → GT-st puuduvad pildil olevad read. Allikas:
+CITlabi „Matcher" automaatjoondus — **kogu Zürich** (999/1 000), Escher,
+semper, Pyl, parthey, hufeland, nn_msgermqu — ja Bullinger (lisaks mitu
+XML-versiooni sama faili kohta). ≥ 2 tühja reaga lehtedest 58 % on
+GT-kontrolli kandidaadid, 0–1-ga 3–5 %. GT-kontroll üksi seda ei püüa
+(Zürich: CER 0,5 %, mudel õppis samad read vahele jätma) → kõik allikad
+auditeeritud XML-i tasemel; Dresdneri vana TEI-ehitaja oli eraldi katki.
 
-**`data/kurrent_v4/` = 18 983 rida**: v2 − 1 684 osalise GT-ga lehte;
-Bullinger 1 837 → 716 (parim XML-versioon, puhas); +2 463 lehte DTA
-Kosmos-Nachschriften (9 kätt 1827–29, täistekst TEI-st, asendab Matcheri
-versiooni); Escher 201 → 768 (kõik puhtad, kasutaja kinnitas pildid).
-Holdout 133 → 128 (5 olid sama vea all). Detailid, mõõtmised ja skriptid:
-`docs/kurrent-andmestikud.md` „Ülevaatus 2026-10-04".
+**`data/kurrent_v4/` = 18 973 rida** (treeninguks 18 863): v2 − osalise GT-ga
+lehed (xix 1 684, Zürich 999, Bullinger, Trolldom 19, Königsfelden 3);
+Bullinger 1 837 → 709 (parim XML-versioon); Dresdner 241 → 166 (uus ehitaja);
++2 463 DTA Kosmos-Nachschriften (9 kätt 1827–29), +707 Geusau reisipäevik 1740,
++386 Sandersi kirjad (DTA TEI täistekst); Escher 201 → 768.
+**Holdout 133 → 110**; DTA-lehti holdout'is ei ole. Detailid, auditi tabel ja
+skriptid: `docs/kurrent-andmestikud.md` „Ülevaatus 2026-10-04".
 
-Tootmismudel: ridade vahelejätmine vanadel 73 holdout-lehel viik
-(29 vs 31 rida) → tagasivahetust ei ole vaja. Järgmine treening v4-ga
-(plaan: nädalavahetus 10.–11.10), enne seda GT-kontrolli tulemuste
-läbivaatus ja uute lehtede struktuurne sõelumine.
+Parandus: ridade vahelejätmine EI tulnud alles v2-ga — 29.08 andmestikus oli
+8 000 Zürichi Matcheri-lehte. Vanade 73 holdout-lehe võrdlus (29 vs 31 rida)
+oli osaliselt vigase GT peal. Tagasivahetust pole vaja; järgmine treening v4-ga
+(nädalavahetus 10.–11.10). Zürichi täistekst on olemas (Zenodo 10517999),
+taastamine järgmises iteratsioonis.
 
 **Kontrollnimekiri: kohe kui GT-kontroll on valmis (~05.10 17:00)**
 
@@ -375,17 +380,17 @@ läbivaatus ja uute lehtede struktuurne sõelumine.
    mv data/kurrent_v4 data/kurrent
    # tööriistade väljundid kaasa — gt_kontroll jätkab tüve järgi, eval/oesel loevad siit
    mv $K/data_kurrent_v2/{gt_kontroll,eval,oesel} data/kurrent/
-   rm -rf data/kurrent_v3 data/bullinger_v3 data/dta_kosmos data/escher_lisa data/dta_tei/img
+   rm -rf data/kurrent_v3 data/bullinger_v3 data/dta_kosmos data/dta_lisa data/escher_lisa data/dresdner_v2 data/dta_tei/img
    ```
    Vahekaustad on ainult CSV-d + hardlinkid (kokku ~40 MB) ja skriptidega
    uuesti ehitatavad. `data/dta_tei/*.xml` JÄÄB (TEI vahemälu, 9 MB).
 4. **Uued lehed läbi sama mudeli:** `venv/bin/python scripts/gt_kontroll.py --paralleel 3`
-   — jätkab tüve järgi, st teeb ainult `dta_*`, `esch_*`, `blv3_*` (~3 700 lk, ~5 h).
+   — jätkab tüve järgi, st teeb ainult `dta_*`, `esch_*`, `blv3_*`, `dresdner1665_*` (~5 000 lk, ~7 h).
    Siin sõelu AINULT struktuurselt (väljund GT-st > 1,3× pikem, loop, GT algab
    keset lehte) — mudel ei ole neid käsi näinud, kõrge CER ei tõenda GT viga.
 5. Kandidaadid (2 + 4) välja `data/kurrent/metadata.csv`-st (skript on veel
    kirjutamata; holdout jääb puutumata), dokumenteeri `kurrent-andmestikud.md`-sse.
-6. `venv/bin/python scripts/train_kurrent.py --test --16bit` → rida `Andmestik:` = ridu miinus holdout 128.
+6. `venv/bin/python scripts/train_kurrent.py --test --16bit` → rida `Andmestik:` = ridu miinus holdout 110.
 7. Treening v4-ga nädalavahetusel 10.–11.10 (retsept §3.5; OCR-teenus maas, teavita kasutajaid).
    `~/_kustutamiseks_20261002/hf_cache/` kustutada alles pärast treeningut.
 

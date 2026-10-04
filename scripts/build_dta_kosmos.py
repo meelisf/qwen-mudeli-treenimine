@@ -20,6 +20,7 @@ Väljund: data/dta_kosmos/{images/, metadata.csv, projektid.csv, SOURCE.txt}
 
 Käivitus:
   venv/bin/python scripts/build_dta_kosmos.py --dry-run   # ainult loendab, pilte ei laadi
+  venv/bin/python scripts/build_dta_kosmos.py --grupp lisa  # Geusau + Sanders → data/dta_lisa
   venv/bin/python scripts/build_dta_kosmos.py
   venv/bin/python scripts/build_dta_kosmos.py --naita parthey_msgermqu1711_1828 673
 """
@@ -32,16 +33,26 @@ from pathlib import Path
 DRY = "--dry-run" in sys.argv
 TEI_DIR = Path("data/dta_tei")
 IMG_CACHE = TEI_DIR / "img"
-OUT = Path("data/dta_kosmos")
-ALLIKAS = "dta_kosmos_1827"
 MIN_LINES = 5
 IMG_URL = "https://media.dwds.de/dta/images/{id}/{id}_{n:04d}_1600px.jpg"
-TEOSED = [
+KOSMOS = [
     "parthey_msgermqu1711_1828", "hufeland_privatbesitz_1829",
     "nn_msgermqu2124_1827", "nn_msgermqu2345_1827",       # xix-is Matcheriga
     "libelt_hs6623ii_1828", "patzig_msgermfol841842_1828",
     "willisen_humboldt_1827", "nn_oktavgfeo79_1828", "nn_n0171w1_1828",
 ]
+# --grupp lisa (04.10): DTA täiskorpuse käsikirjad (TEI: data/raw_xml/dta_komplett,
+# lingitud data/dta_tei/ alla). Geusau = Heinrich XI. Reuß reisipäevik 1740 (kiire
+# Kurrent, prantsuse kohanimed antiikvas); Sanders = Daniel Sandersi kirjad 1859–80.
+GRUPID = {
+    "kosmos": (Path("data/dta_kosmos"), "Kosmos-Nachschriften 1827–29",
+               {t: "dta_kosmos_1827" for t in KOSMOS}),
+    "lisa": (Path("data/dta_lisa"), "käsikirjad: Geusau 1740, Sanders 1859–80",
+             {"geusau_reisetagebuchHeinrichxiReuss_1740": "dta_geusau_1740",
+              **{p.stem: "dta_sanders_1860" for p in sorted(TEI_DIR.glob("sanders_*.xml"))}}),
+}
+GRUPP = sys.argv[sys.argv.index("--grupp") + 1] if "--grupp" in sys.argv else "kosmos"
+OUT, KIRJELDUS, TEOSED = GRUPID[GRUPP]
 NS = "{http://www.tei-c.org/ns/1.0}"
 EI_SISU = {"expan", "reg", "corr", "supplied", "metamark", "figDesc", "graphic", "teiHeader"}
 
@@ -184,7 +195,7 @@ def main():
                     continue
                 (OUT / "images").mkdir(parents=True, exist_ok=True)
                 os.link(src, OUT / name)
-            rows.append((name, t, ALLIKAS, teos))
+            rows.append((name, t, TEOSED[teos], teos))
     print(f"kokku: {dict(stats)} → {len(rows)} lehte")
     if DRY:
         return
@@ -198,7 +209,7 @@ def main():
         w.writerows((r[0], "dta:" + r[3]) for r in rows)
     (OUT / "SOURCE.txt").write_text(
         f"ehitatud: {datetime.now():%Y-%m-%dT%H:%M:%S}  scripts/build_dta_kosmos.py\n"
-        f"Deutsches Textarchiv, Kosmos-Nachschriften 1827–29, CC BY 4.0\n"
+        f"Deutsches Textarchiv, {KIRJELDUS}, CC BY 4.0\n"
         f"teosed: {', '.join(TEOSED)}\nlehti: {len(rows)}  välja: {dict(stats)}\n", encoding="utf-8")
     print(f"valmis: {OUT}")
 

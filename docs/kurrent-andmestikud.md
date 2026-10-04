@@ -316,28 +316,29 @@ Taust: GT kiirkontroll (SEIS §6.11 tee c, `scripts/gt_kontroll.py`, mudel
 `kurrent-20261002` üle treeningkomplekti) näitas kandidaatide koondumist kahte
 allikasse: Escher (50 % lehtedest) ja `bullinger_autoren` (30 %). Silmaga
 kontrollitud: GT-st puuduvad read, mis pildil on olemas (nt Escher 4505: 7 rida
-20-st), ja mudel on ridade vahelejätmist juba õppinud (17717, 7005).
+20-st), ja mudel on ridade vahelejätmist õppinud (17717, 7005).
 
 ### Põhjus: tühjad TextLine'id jäetakse vaikselt vahele
 
-`build_kurrent_dataset.parse_pagexml` jätab teksti(ta) TextLine'i vahele
+Kõik PAGE XML-i ehitajad (`build_kurrent_dataset`, `build_riksarkivet_dataset`,
+`build_senatsprotokolle_dataset` jt) jätavad teksti(ta) TextLine'i vahele
 (`if uc is None or not uc.text: continue`). Pilt näitab rida, GT-s seda pole.
 
 Kust tühjad read tulevad:
 - **CITlabi „Matcher"** (`<Creator>`-is `Matcher(net_0.sprnn…)`): editsioonitekst
   on automaatselt joondatud tuvastatud ridadele; kus joondus ebaõnnestus, jäi
-  rida tühjaks. Matcher-projektid: Escher, `semper_20_MS`, `Pyl_M3–M5`,
-  `parthey`, `hufeland_privatbesitz_1829`, `nn_msgermqu2124/2345`.
-- **Bullinger**: 80 % treeningulehtedest ≥ 2 tühja rida (Transkribus);
-  lisaks on **sama fail HF-andmestikus mitmes versioonis eri XML-iga** —
-  voogedastus võttis esimese, 100 lehel oli täielikum versioon olemas.
-- AAEB, Hanse XVI/XVII, Königsfelden: praktiliselt puhtad.
+  rida tühjaks. Matcher-projektid: **Zürich (kõik)**, Escher, `semper_20_MS`,
+  `Pyl_M3–M5`, `parthey`, `hufeland_privatbesitz_1829`, `nn_msgermqu2124/2345`.
+  Täidetud read võivad olla ka VALED (Zürich lk 308: „56." Transpordi real,
+  lehenumber 308 → „200.").
+- **Bullinger**: 80 % treeningulehtedest ≥ 2 tühja rida (Transkribus); lisaks on
+  **sama fail HF-andmestikus mitmes versioonis eri XML-iga** — voogedastus
+  võttis esimese, 100 lehel oli täielikum versioon olemas.
 
-Mõõdik: `scripts/tuhjad_read_audit.py` → `data/kurrent_xix_audit/tuhjad_read.csv`
-(xix + hanse, kohalik HF cache) ja `--kaug` → `tuhjad_read_kaug.csv`
-(Bullinger, AAEB, Königsfelden otse HF-ist, ainult `xml_content` veerg —
-pilte ei laadita). Veerud: allikas, projekt, failinimi, ridu, tühje, looja,
-`treeningus` (andmestiku failinimi).
+**GT-kontroll üksi seda viga EI püüa.** Zürichi mediaan-CER oli 0,5 % ja
+kandidaate 0: mudel on 8 000 Zürichi lehelt õppinud samu ridu vahele jätma,
+väljund ja GT jätavad sama vahele. Seepärast auditeeritakse KÕIK allikad XML-i
+tasemel (allpool), GT-kontroll on teine kiht.
 
 **Lävi on mõõdetud, mitte valitud.** GT-kontrolli kandidaatide osakaal
 (normaliseeritud CER ≥ 10 % mudelil, mis on neid lehti treeningus näinud):
@@ -348,25 +349,74 @@ pilte ei laadita). Veerud: allikas, projekt, failinimi, ridu, tühje, looja,
 | 1 | 3 % | 0/13 | |
 | ≥ 2 | **58 %** | **62 %** | **35 %** |
 
-Üksik tühi rida on enamasti müra (tempel, kriips) → lävi **≥ 2 tühja rida = välja**.
+Üksik tühi rida on enamasti müra (tempel, kriips) → lävi **≥ 2 tühja rida = välja**
+(ka holdout'ist: katkine GT ei sobi ka mõõtmiseks).
 
-### DTA Kosmos-Nachschriften: osalise GT asemel täistekst
+### Audit: kõik 24 allikat
+
+Tühjade ridade mõõtmine, väljundid `data/kurrent_xix_audit/tuhjad_read*.csv`
+(veerud: ridu, tühje, `treeningus` = andmestiku failinimi). Kus failinimi on
+lõigatud (Riksarkiv: 60 märki, lehe ID kaob), seotakse treeningrida XML-iga
+**teksti järgi** (sama `parse_pagexml`). Mitme XML-versiooni korral valitakse
+see, mille täidetud ridade arv = GT ridade arv.
+
+| allikas | skript / kiht | tulemus v4-s |
+|---|---|---|
+| xix (5 perioodi) | `tuhjad_read_audit.py` (kohalik HF cache) | −1 684 (Escher, semper, Pyl, …) |
+| Zürich | `audit_zurich.py` (HF, ainult xml-veerg) | **999/1 000 Matcher, ≥2 tühja → välja** (1 jääb) |
+| Bullinger | `tuhjad_read_audit.py --kaug` | ehitatud uuesti (`build_bullinger_v3.py`), 709 |
+| AAEB, Königsfelden | `--kaug` | AAEB puhas; Königsfelden −3 |
+| Hanse XVI / XVII | `tuhjad_read_audit.py` | puhas |
+| Svea, Krigshovrätt, Bergskollegium ×2, Göta, Jönköping | `audit_riksarkivet.py` (ainult page_xmls tar) | puhas, kõik read seotud |
+| Trolldomskommissionen | `audit_riksarkivet.py` | −19 |
+| Senatsprotokolle | ad hoc (ubtue GitHub sparse) → `tuhjad_read_senats.csv` | puhas 229/229 |
+| Dresdner 1665 | silmaga + TEI | **vana ehitaja katki** → `build_dresdner_v2.py`, 166 |
+| DTA Kosmos / Geusau / Sanders | TEI täistekst (pole TextLine'e) | gap/tabel/U+FFFC lehed välja; struktuurne sõelumine ootel |
+| Escher-lisa | `tuhjad_read.csv` | ainult ≤1 tühi |
+| vutt_horedad | VUTT „Valmis" (inimese kinnitatud) | — |
+
+Toor-XML (kohalik): `~/_kustutamiseks_20261002/hf_cache/` (xix, hanse),
+`data/raw_xml/riksarkivet/` (HF cache), `data/raw_xml/ubtue-gt/`,
+`data/raw_xml/hofdiarium1665.xml`, `data/raw_xml/dta_komplett/`,
+`data/raw_xml/zh_rrb/` (Zürichi editsioon, vt allpool).
+
+### Dresdner 1665: vana ehitaja oli katki
+
+`build_dresdner_tei_dataset.py` lamendas TEI: tabeli veerud segunesid ühele
+reale (lk 00000016), `pb` piiril lekkis järgmise lehe tekst sisse (`pb` on sageli
+`persName`-i sees; lk 16 lõppes „Und ſchanckte vor S", mida lehel pole) ja
+marginaalid (`note`, 296) visati ära. `build_dresdner_v2.py` kasutab DTA
+konverteri `Lehed`-klassi (pb mis tahes sügavusel) ja:
+`<ex>` (toimetaja laiend) → „." (lehel on laiendi kohal lühendusmärk: „Se. Churf.
+durchl."; nii kirjutasid transkribeerijad ka tabelilahtrites); tabeliga leht välja
+(84); ſ jääb (XVII saj allikates on ſ). 250 diaryEntry-lehest **166**.
+
+### DTA käsikirjad: osalise GT asemel täistekst
 
 Matcheri allikas on Deutsches Textarchiv (DTA). DTA TEI kannab sama käsikirja
 **täielikku lehe teksti**; treenime lehe tasemel, nii et reajoondust ei ole
 vaja. `<pb facs="#fNNNN">` = xix failinime lehenumber (parthey 801 = 801,
 hufeland 172, nn_msgermqu 175/341 — kontrollitud silmaga parthey 673).
 
-Loend: HU Berlin „Nachschriften der Kosmos-Vorträge" (Christian Thomas).
-Kasutusel 9 (CC BY 4.0): `parthey_msgermqu1711_1828`, `hufeland_privatbesitz_1829`,
-`nn_msgermqu2124_1827`, `nn_msgermqu2345_1827` (olid xix-is Matcheriga) +
-**5 uut kätt**: `libelt_hs6623ii_1828`, `patzig_msgermfol841842_1828`,
-`willisen_humboldt_1827`, `nn_oktavgfeo79_1828`, `nn_n0171w1_1828`.
-`riess_f2e1853_1828` on DTAQ-s (kvaliteedikontrollis), avalikult ei saa.
-Lohde ja Stenmark ei ole DTA-s (ainult pildid).
+**Kosmos** (`--grupp kosmos` → `data/dta_kosmos/`, allikas `dta_kosmos_1827`):
+loend HU Berlin „Nachschriften der Kosmos-Vorträge". 9 teost, CC BY 4.0:
+`parthey_msgermqu1711_1828`, `hufeland_privatbesitz_1829`, `nn_msgermqu2124_1827`,
+`nn_msgermqu2345_1827` (olid xix-is Matcheriga) + 5 uut kätt: `libelt_hs6623ii_1828`,
+`patzig_msgermfol841842_1828`, `willisen_humboldt_1827`, `nn_oktavgfeo79_1828`,
+`nn_n0171w1_1828`. 3 526 lehest **2 463**. `riess_f2e1853_1828` on DTAQ-s
+(avalikult ei saa); Lohde ja Stenmark ei ole DTA-s.
+
+**Lisa** (`--grupp lisa` → `data/dta_lisa/`): DTA täiskorpuse
+(`dta_komplett_2026-02-10.zip`) käsikirjad — `basisformat_ms` / `handNote`:
+- `geusau_reisetagebuchHeinrichxiReuss_1740` → `dta_geusau_1740`, **707** lk:
+  Heinrich XI. Reußi reisipäevik, kiire isiklik Kurrent, prantsuse kohanimed
+  antiikvas, marginaalid. Silmaga kontrollitud lk 423. Pildi allservas
+  digiteerija URN-riba (GT-s pole — mudel õpib eirama).
+- `sanders_*` (172 kirja) → `dta_sanders_1860`, **386** lk: Daniel Sandersi kirjad 1859–80.
+- Humboldti kirjad Sömmerringile 1791/95: DTA-s pilte pole (404).
 
 Allalaadimine: TEI `https://www.deutschestextarchiv.de/book/download_xml/<id>`
-(nõuab küpsist `verified=1`), pildid
+(küpsis `verified=1`) või täiskorpuse zip (`/download`); pildid
 `https://media.dwds.de/dta/images/<id>/<id>_<NNNN>_1600px.jpg`.
 Vahemälu `data/dta_tei/` (TEI + `img/`).
 
@@ -378,68 +428,89 @@ TEI → diplomaatiline tekst (`scripts/build_dta_kosmos.py`):
   `metamark` välja
 - `ſ` → `s` (ülejäänud Kurrendi GT-s ſ-i ei ole); rea lõpu `-` jääb nagu DTA-s
   (korpus on niikuinii segi: `¬` ja `-`)
-- **leht välja**, kui seal on `gap` (loetamatu/kadunud: 246), tabel (21),
-  U+FFFC (esitamatu lühendusmärk: 656, enim Patzig) või < 5 rida (140)
+- **leht välja**, kui seal on `gap` (loetamatu/kadunud), tabel, U+FFFC
+  (esitamatu lühendusmärk; enim Patzig) või < 5 rida
+Proovida `--naita <id> <nr>`.
 
-Tulemus: 3 526 lehest **2 463**. Proovida `--naita <id> <nr>`.
+### Ehitatud: andmestik v4 (2026-10-04, lõplik)
 
-### Ehitatud: andmestik v4 (2026-10-04)
-
-Neli sammu, iga samm oma kausta (pildid hardlink'itud, sisend puutumata):
+Iga samm oma kausta (pildid hardlink'itud, sisend puutumata):
 
 | samm | skript | kaust | lehti |
 |---|---|---|---|
-| v2 miinus ≥ 2 tühja reaga xix-lehed | `build_kurrent_v3.py` | `data/kurrent_v3/` | 18 908 → 17 224 (−1 684) |
-| Bullinger uuesti: parim XML-versioon, ≤ 1 tühi rida | `build_bullinger_v3.py` | `data/bullinger_v3/` | 707 (540 pilti olemas, 169 HF-ist) |
+| v2 miinus ≥ 2 tühja reaga xix-lehed | `build_kurrent_v3.py` | `data/kurrent_v3/` | 18 908 → 17 224 |
+| Bullinger: parim XML-versioon, ≤ 1 tühi rida | `build_bullinger_v3.py` | `data/bullinger_v3/` | 707 |
 | DTA Kosmos | `build_dta_kosmos.py` | `data/dta_kosmos/` | 2 463 |
-| Escheri kõik puhtad unikaalsed lehed | `build_escher_lisa.py` | `data/escher_lisa/` | +567 |
-| koondamine | `build_kurrent_v4.py` | **`data/kurrent_v4/`** | **18 983** |
+| DTA lisa (Geusau, Sanders) | `build_dta_kosmos.py --grupp lisa` | `data/dta_lisa/` | 1 093 |
+| Escheri kõik puhtad unikaalsed lehed | `build_escher_lisa.py` | `data/escher_lisa/` | 567 |
+| Dresdner uuesti | `build_dresdner_v2.py` | `data/dresdner_v2/` | 166 |
+| koondamine + audit-filter | `build_kurrent_v4.py --uuesti` | **`data/kurrent_v4/`** | **18 973** |
 
-v3-st eemaldatud projekti kaupa: Escher −799, semper −259 (≈ kõik), parthey −184,
-Pyl M3–M5 −313, nn_msgermqu −57, hufeland −23, ülejäänud üksikud.
-v4 koondamisel: vana Bullinger −1 828 (holdout'i 9 jäävad), parthey/hufeland/
-nn_msgermqu Matcheri jäägid −150 (asendab DTA), + Bullinger v3, DTA, Escher.
+Koondamisel: audit −2 363 (Bullinger 1 342, Zürich 999, Trolldom 19,
+Königsfelden 3), vana Bullinger −493, vana Dresdner −238, Matcheri DTA-jäägid
+−150; lisandub 707 + 2 463 + 1 093 + 567 + 164.
 
 Escher: kasutaja vaatas pildid üle (04.10) — eri käed, VUTT-ile lähedased;
 v2 Escheri lagi 1 000 kaotati. Unikaalseid transkribeeritud lehti 3 819, neist
-puhtaid (≤ 1 tühi, ≥ 5 rida) 768 — rohkem puhast Escheri ei ole (ülejäänud
-~9 700 toorkirjet on transkribeerimata lehed).
+puhtaid (≤ 1 tühi, ≥ 5 rida) 768 — rohkem ei ole (ülejäänud ~9 700 toorkirjet
+on transkribeerimata lehed).
 
 Allikad v4-s (lehti): xix_read_1750_99 2 564, **dta_kosmos_1827 2 463**,
 aaeb 1 982, xix_read_1800_49 1 793, bergskollegium_rel 1 439, hanse_xvii 1 292,
-xix_read_1850_99 1 287, hanse_xvi 1 144, zurich 1 000, svea 847, trolldom 761,
-**bullinger 716**, xix_read_1900 559, krigshovratt 343, dresdner 241, senats 229,
-dateerimata 101, jonkopings 57, bergskollegium_adv 53, gota 51, koenigsfelden 34,
-vutt_horedad 27. Periood 1800–49 kokku ~4 260 (v2: ~1 940).
+xix_read_1850_99 1 287, hanse_xvi 1 144, svea 847, trolldom 742, bullinger 709,
+**dta_geusau_1740 707**, xix_read_1900 559, **dta_sanders_1860 386**,
+krigshovratt 343, senats 229, dresdner 166, dateerimata 101, jonkopings 57,
+bergskollegium_adv 53, gota 51, koenigsfelden 31, vutt_horedad 27, zurich 1.
 
-**Holdout 133 → 128**: 5 lehte olid sama vea all (Pyl, Escher ×2, semper, Dreier)
-ja on eemaldatud ka treeningust. Võrdle mudeleid nende 128 peal.
+**Holdout 133 → 110** (v3 −5, v4 −18: Zürich 10, Bullinger 7, Dresdneri tabel 1).
+Treeninguks 18 863. NB: holdout'is EI OLE DTA-lehti (Kosmos, Geusau, Sanders) —
+neid ei mõõdeta, kuni holdout'i ei laiendata.
 
-Kontrollitud: 18 983 unikaalset failinime, 0 puuduvat pilti, 0 tühja teksti,
-128/128 holdout-rida CSV-s.
+Kontrollitud: 18 973 unikaalset failinime, 0 puuduvat pilti, 0 tühja teksti,
+110/110 holdout-rida CSV-s.
 
-### Tootmismudel ja ridade vahelejätmine
+### Tootmismudel ja ridade vahelejätmine (PARANDATUD)
 
-Ridade vahelejätmise võis tuua alles v2 (29.08 andmestikus Matcheri lehti ei
-olnud). Mõõdetud eval-väljunditest (GT rida ≥ 8 märki, mille parim vaste
-väljundis < 0,6): vanad 73 holdout-lehte — `kurrent-20260829` 29 puuduvat rida
-(15 lehel), `kurrent-20261002` 31 (13 lehel) = **viik, tagasivahetust ei ole
-vaja**. Kõigil 128-l: 177 → 48. Halvim üksikjuhtum 22229 (uus jätab osa lehe
-igast teisest reast vahele).
+Esialgne väide „ridade vahelejätmise tõi alles v2" oli **vale**: 29.08
+andmestikus oli 8 000 Zürichi lehte, kõik Matcheriga — viga on mõlemas mudelis.
+Eval-väljunditest (GT rida ≥ 8 märki, mille parim vaste väljundis < 0,6): vanad
+73 holdout-lehte — `kurrent-20260829` 29 puuduvat rida, `kurrent-20261002` 31 =
+viik; kõigil 128-l 177 → 48. See võrdlus ise oli osaliselt vigase GT peal
+(10 Zürichi lehte vanadest 73-st) → tagasivahetust ei ole vaja, aga mõlemad
+mudelid jätavad tõenäoliselt ridu vahele just tabelites ja marginaalides.
+
+### Zürich: täistekst on olemas (järgmine iteratsioon)
+
+Zenodo 10517999 „TEI-XML Zürcher Regierungsratsbeschlüsse 1803–1887"
+(CC BY-SA 4.0, 166 755 otsust, `data/raw_xml/zh_rrb/`): Wordi-transkriptid,
+täielik tekst, tabelid rida-realt, `<pb n="308"/>` täpselt õiges kohas — lk 308
+kõik 26 puuduvat rida on olemas. AGA: jooksvas tekstis reavahetusi pole,
+marginaalpealkiri on päises `<title>` (normaliseeritud), kuupäevapäis ainult
+`1807-05-28`. Taastamine: Matcheri õiged täidetud read ankruteks (proosa;
+tabeliread on Matcheris valed → geomeetria järgi), ankrute vahe editsioonist
+tühjadele ridadele; lehed, mida ei õnnestu üheselt taastada, välja. Kasutaja:
+käsi on relevantne, ebatraditsiooniline lehekuju aitab. ~pool päeva + kontroll.
+`dh-unibe/image-text_zh-regierungsratsprotokolle` (HF) on SAMA Matcheri materjal.
+
+### Vaadatud 04.10, mitte kasutusel
+
+- Zenodo 17252677 pages/: uusi lehti ~27 (Auerbach, Erbkam, Baieri Schriftkunde) — liiga vähe.
+- `DenisaBumba/htr_leibniz_dataset_v1`: Leibniz, XVII saj ladina/prantsuse
+  õpetlaskäsi — VUTT-i jaoks väga asjakohane, aga reataseme ja osaliselt
+  automaatjoondus; lehe tasemel treeningusse ei sobi otse.
+- dh-unibe 1848+ kogud (Bundesratsprotokolle jms): kantseleikäsi, sama ühekülgsus mis Zürich.
 
 ### Enne treeningut veel lahti
 
+Vt SEIS §3.4d „Kontrollnimekiri".
 - GT-kontroll (jookseb `data/kurrent`-i peal, lõpp ~05.10 17:00): v2-st pärit
-  lehtedel CER ≥ 10 % = mudel nägi lehte treeningus → tugev GT-vea märk.
-  Vaata iga allika kohta näiteid ENNE hulgi väljaviskamist.
-- Uued lehed (DTA, Escher-lisa, Bullingeri uued versioonid) läbi sama mudeli,
-  aga sõelu AINULT struktuursete tunnuste järgi (väljund GT-st selgelt pikem,
-  loop, GT algab keset lehte) — mudel ei ole neid käsi näinud, kõrge CER ei
-  tõenda GT viga.
-- Vahetus: `data/kurrent_v4` → `data/kurrent` (praegune kaust on GT-kontrolli
-  sisend — mitte enne selle lõppu). `train_kurrent.py` loeb `data/kurrent/`.
+  lehtedel CER ≥ 10 % = tugev GT-vea märk. Vaata iga allika kohta näiteid ENNE
+  hulgi väljaviskamist.
+- Uued lehed (DTA, Escher-lisa, Bullinger v3, Dresdner v2) läbi sama mudeli,
+  sõelu AINULT struktuurselt (väljund GT-st selgelt pikem, loop, GT algab keset
+  lehte) — mudel ei ole neid käsi näinud.
 - Toor-XML (`~/_kustutamiseks_20261002/hf_cache/`) **ära kustuta enne uut
-  treeningut** — kõik ehitusskriptid loevad sealt.
+  treeningut**.
 
 ---
 
