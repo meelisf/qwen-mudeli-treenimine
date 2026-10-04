@@ -81,6 +81,7 @@ from PIL import Image as PILImage
 sys.path.insert(0, str(Path(__file__).parent))
 from imaging import MAX_PIXELS, fit_to_grid
 from prompt import INSTRUCTION, KURRENT_INSTRUCTION
+from lyhend_makron import makroniks
 
 csv.field_size_limit(10 ** 7)
 
@@ -441,7 +442,10 @@ else:
 # Mõõdikud
 tulemused = []
 for allikas, failinimi, hyp in rows:
-    ref = gt[failinimi].strip()
+    # Lühendusmärk tilde ≡ makron (VUTT ADR 0062): GT on alates v4-st makroniga,
+    # vanemad mudelid kirjutavad tilde — muidu oleks CER-i erinevus kunstlik.
+    ref = makroniks(gt[failinimi].strip())[0]
+    hyp = makroniks(hyp)[0]
     ratio = len(hyp) / max(len(ref), 1)
     tulemused.append({
         "failinimi": failinimi, "allikas": allikas,

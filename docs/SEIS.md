@@ -394,6 +394,12 @@ taastamine järgmises iteratsioonis.
    kirjutamata; holdout jääb puutumata), dokumenteeri `kurrent-andmestikud.md`-sse.
 6. `venv/bin/python scripts/train_kurrent.py --test --16bit` → rida `Andmestik:` = ridu miinus holdout 130 (18 843).
 7. Treening v4-ga nädalavahetusel 10.–11.10 (retsept §3.5; OCR-teenus maas, teavita kasutajaid).
+   **Enne `train_kurrent`-i** (teenus on juba maas): `scripts/prompt.py` `KURRENT_INSTRUCTION`-isse
+   reegel „lühendusmärk (rõhtjoon tähe kohal, nasaal/geminatsioon) = makron U+0304, mitte tilde"
+   — GT on v4-s juba makroniga (VUTT ADR 0062). Teenus laeb juhise käivitusel `prompt.py`-st →
+   juhis ja mudel lähevad tootmisse KOOS (§3.3); varem muutes saaks vana mudel uue juhise.
+   NB: trüki-`INSTRUCTION` ütleb veel „ũ, ñ, õ – keep as is (tilde preserved)" — see muutub
+   trükimudeli järgmise treeninguga (VUTT #533 samm 4), mitte nüüd.
    `~/_kustutamiseks_20261002/hf_cache/` kustutada alles pärast treeningut.
 
 ### 3.5 Retsept, kui vaja korrata

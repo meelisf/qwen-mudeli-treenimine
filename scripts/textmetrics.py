@@ -13,6 +13,8 @@ import re
 
 import editdistance
 
+from lyhend_makron import makroniks
+
 TAG = re.compile(r"</?[a-zA-Z][^>]*>")
 
 
@@ -28,8 +30,9 @@ def strip_tags(text: str) -> str:
 
 
 def normaliseeri(s: str) -> str:
-    """Sisu võrdlemiseks: märgendid, kirjavahemärgid ja tühik maha."""
-    s = strip_tags(s).lower()
+    """Sisu võrdlemiseks: märgendid, kirjavahemärgid ja tühik maha.
+    Lühendusmärk tilde ≡ makron (VUTT ADR 0062): vana mudel kirjutab tilde, GT makronit."""
+    s = makroniks(strip_tags(s))[0].lower()
     return re.sub(r"[^\w]", "", s, flags=re.UNICODE)
 
 

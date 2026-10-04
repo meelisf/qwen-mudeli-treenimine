@@ -9,6 +9,7 @@
   - Escheri kõik puhtad lehed: data/escher_lisa
   - dresdner_1665 asendatakse data/dresdner_v2-ga (õige pb piir, tabeliga
     lehed välja); holdout-lehe tekst võetakse v2-st, tabelileht kukub välja
+  - lühendusmärk tilde/ülakriips → makron kõigis ridades (VUTT ADR 0062)
   - holdout: + Geusau 10 ja Kosmos 10 (iga käsikiri korra), vt lisa_holdout
   - AUDIT: iga AUDITID-faili treeningrida, millel ≥ LAVI tühja TextLine'i,
     läheb välja — ka holdout'ist (katkine GT ei sobi ka mõõtmiseks)
@@ -20,6 +21,9 @@ import csv, os, random, re, shutil, sys
 from collections import Counter, defaultdict
 from datetime import datetime
 from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).parent))
+from lyhend_makron import makroniks                                   # noqa: E402
 
 DRY = "--dry-run" in sys.argv
 BASE = Path("data/kurrent_v3")
@@ -141,11 +145,23 @@ def main():
             assert r[0] not in src, r[0]
             out.append(r); src[r[0]] = d; proj[r[0]] = p[r[0]]
             st[nimi] += 1
+    # Lühendusmärk → makron kõigis ridades, sh holdout (ADR 0062). makroniks
+    # tagastab NFC — rakendatakse KÕIGILE, sest lahutatud „e + U+0304" ja „ē" on
+    # mudelile kaks eri järjestust (Königsfelden, Hanse, Senats).
+    mk, nfc = Counter(), 0
+    for i, r in enumerate(out):
+        t, n = makroniks(r[1])
+        mk[r[2]] += n
+        if t != r[1]:
+            nfc += not n
+            out[i] = [r[0], t, r[2]]
+    mk = Counter({k: v for k, v in mk.items() if v})
     ho_uued = lisa_holdout(out, proj)
     print(f"v3 {len(base)} → v4 {len(out)}")
     for k, v in sorted(st.items()):
         print(f"  {k}: {v}")
     print(f"holdout −{len(ho_valja)}: {sorted(ho_valja)}")
+    print(f"makron (märke allika kaupa): {dict(mk.most_common())}; ainult NFC-ga muutunud ridu {nfc}")
     print(f"holdout +{len(ho_uued)} DTA: {Counter(proj[f] for _, f in ho_uued)}")
     print(Counter(r[2] for r in out).most_common())
     if DRY:
@@ -168,7 +184,8 @@ def main():
     (NEW / "SOURCE.txt").write_text(
         (BASE / "SOURCE.txt").read_text(encoding="utf-8")
         + f"\nehitatud: {datetime.now():%Y-%m-%dT%H:%M:%S}  scripts/build_kurrent_v4.py\n"
-        f"v3 {len(base)} → {len(out)}  {dict(st)}  holdout −{len(ho_valja)} +{len(ho_uued)}\n", encoding="utf-8")
+        f"v3 {len(base)} → {len(out)}  {dict(st)}  holdout −{len(ho_valja)} +{len(ho_uued)}\n"
+        f"lühendusmärk → makron (ADR 0062, scripts/lyhend_makron.py): {sum(mk.values())} märki\n", encoding="utf-8")
     print(f"valmis: {NEW}")
 
 

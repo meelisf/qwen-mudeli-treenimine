@@ -471,6 +471,19 @@ Vana↔uue mudeli võrdluseks: vanad 73 miinus 10 Zürichi = 63 lehte.
 Kontrollitud: 18 973 unikaalset failinime, 0 puuduvat pilti, 0 tühja teksti,
 130/130 holdout-rida CSV-s.
 
+### Lühendusmärk → makron (VUTT ADR 0062, #533)
+
+`build_kurrent_v4.py` rakendab kõigile ridadele (sh holdout) `scripts/lyhend_makron.py`
+`makroniks`-i: ladina tähe kohal U+0303 tilde ja U+0305 ülakriips → U+0304 makron,
+topeltmakron → üks, väljund NFC. Puutumata: kreeka (U+0342), numbrite vinculum,
+eraldiseisev „~". Muudetud 4 021 märki (Kosmos 2 338, Sanders 1 075, xix 1800–49 410,
+Königsfelden 117, Geusau 40, xix 1850–99 22, Dresdner 19) + 55 rida ainult NFC-ga
+(lahutatud „e + U+0304" Königsfeldenis, Hanses, Senatsis). Pärast: 0 tildet, kõik NFC.
+Mõõtmises tilde ≡ makron: `eval_kurrent.py` (GT ja väljund läbi `makroniks`-i enne
+CER-i) ja `textmetrics.normaliseeri` — vana mudel kirjutab tilde.
+Test: `venv/bin/python scripts/lyhend_makron.py --test`. Kaart PEAB kattuma VUTT-i
+korpuse teisendusega (#533 samm 2).
+
 ### Tootmismudel ja ridade vahelejätmine (PARANDATUD)
 
 Esialgne väide „ridade vahelejätmise tõi alles v2" oli **vale**: 29.08
