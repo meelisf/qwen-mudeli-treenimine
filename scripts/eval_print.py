@@ -81,6 +81,7 @@ from PIL import Image as PILImage
 sys.path.insert(0, str(Path(__file__).parent))
 from convert_marginalia import clean_markup
 from imaging import MAX_PIXELS, fit_to_grid
+from lyhend_makron import makroniks
 from prompt import INSTRUCTION
 
 csv.field_size_limit(10 ** 7)
@@ -461,7 +462,9 @@ else:
 
 tulemused = []
 for failinimi, hyp in rows:
-    ref = gt[failinimi]
+    # Lühendusmärk tilde ≡ makron (VUTT ADR 0062): GT on makroniga, vanemad
+    # mudelid kirjutavad tilde — muidu oleks CER-i erinevus kunstlik.
+    ref, hyp = makroniks(gt[failinimi])[0], makroniks(hyp)[0]
     kirje = {
         "failinimi": failinimi,
         "kiht": kiht(ref),

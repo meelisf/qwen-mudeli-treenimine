@@ -440,6 +440,15 @@ tootmises: käegakatsutavalt parem kui vana.
 aga väline `<m>` jääb panemata. Sama neli lehte nullis **mõlemal mootoril**, ehk
 see on mudeli, mitte ahela omadus. Kandidaat järgmiseks katseks.
 
+**Treeningandmed on makroniga (05.10.2026, VUTT ADR 0062 / #533 samm 4).**
+`data/lehekyljed` (mõlemad CSV-d) ja `data/vutt` läbisid `scripts/lyhend_makron_trukk.py`:
+tilde → makron, prügi (U+E8BF → `q;`, U+F1A7 → `I`, kombineeriv märk rea alguses,
+kreeka tilde → U+0342), kõik NFC. `build_vutt_dataset.py` teeb sama igal uuel ehitusel
+(keelevalvur est/spa/por), `eval_print.py` võrdsustab tilde ja makroni.
+**Järgmise trükitreeningu päeval** muuda `scripts/prompt.py` `INSTRUCTION`-is rida
+„ũ, ñ, õ – keep as is (tilde preserved)" → lühendusmärk = makron — KOOS mudeliga (§3.3),
+mitte varem. Detailid: `truki-andmestikud.md`.
+
 ---
 
 ## 5. Mõõteriistad

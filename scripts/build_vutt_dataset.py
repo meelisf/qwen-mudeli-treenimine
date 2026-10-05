@@ -25,11 +25,13 @@ import json
 import csv
 import shutil
 import re
+import unicodedata
 from datetime import datetime
 from pathlib import Path
 
 from convert_marginalia import clean_markup
 from imaging import prepare_image, MAX_PIXELS
+from lyhend_makron import makroniks
 from prompt import EMPTY_PAGE_MARKER
 
 # Terve lehekülje transkriptsioon võib ületada csv-mooduli vaikimisi
@@ -246,6 +248,22 @@ def read_work_type(work_dir: Path) -> str:
     return "unknown"
 
 
+# Keelevalvur (VUTT ADR 0062 p 3): eesti, hispaania ja portugali keeles on tilde
+# päris täht (õ, ñ, ã) — selliste teoste teksti ei teisendata makroniks.
+VALVURIGA_KEELED = {"est", "et", "spa", "es", "por", "pt"}
+
+
+def read_work_guarded(work_dir: Path) -> bool:
+    """Kas teose `languages` sisaldab keelt, kus tilde on päris täht.
+    Loetamatu metaandmestik → True: keelt teadmata ei tohi õ-d makroniks teha."""
+    try:
+        with open(work_dir / "_metadata.json", encoding="utf-8") as f:
+            langs = json.load(f).get("languages") or []
+    except Exception:
+        return True
+    return any(str(k).strip().lower() in VALVURIGA_KEELED for k in langs)
+
+
 def read_page_status(json_path: Path) -> str | None:
     """Loeb lehekülge .json failist staatuse."""
     try:
@@ -287,6 +305,8 @@ def main():
     skipped_no_txt = 0
     skipped_empty = 0
     cleaned_markup = 0
+    makron_pages = 0
+    makron_guarded = []    # valvuriga teose tildega lehed — käsitsi
     empty_pages = []        # korrektselt märgitud tühjad lehed
     empty_txt_pages = []    # Valmis, aga tekst puudub – kandidaat tühjaks
     sparse_pages = []       # vähese tekstiga lehed (nt ainult lk number)
@@ -309,6 +329,7 @@ def main():
 
     for work_dir in works:
         wtype = read_work_type(work_dir)
+        guarded = read_work_guarded(work_dir)
         if wtype == "unknown" and work_dir not in unknown_works:
             unknown_works.append(work_dir.name)
 
@@ -363,6 +384,14 @@ def main():
             if cleaned != transcription:
                 cleaned_markup += 1
             transcription = cleaned
+            # Lühendusmärk → makron (VUTT ADR 0062), välja arvatud valvuriga keeled
+            if guarded:
+                if "\u0303" in unicodedata.normalize("NFD", transcription):
+                    makron_guarded.append(f"{work_dir.name}/{base}")
+            else:
+                transcription, n_makron = makroniks(transcription)
+                if n_makron:
+                    makron_pages += 1
             if not transcription:
                 skipped_empty += 1
                 continue
@@ -408,6 +437,10 @@ def main():
     print(f"  Vahele jäetud (ei TXT):    {skipped_no_txt}")
     print(f"  Vahele jäetud (tühi tekst):{skipped_empty}")
     print(f"  Normaliseeritud/puhastatud markup: {cleaned_markup}")
+    print(f"  Lühendusmärk → makron: {makron_pages} lehte"
+          f" (valvuriga keel, tilde jäi: {len(makron_guarded)})")
+    for lk in makron_guarded[:20]:
+        print(f"    valvur: {lk}")
     excluded = {k: v for k, v in type_pages.items() if v}
     if excluded:
         print(f"  Vahele jäetud (vale tüüp): "

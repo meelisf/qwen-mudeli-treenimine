@@ -76,6 +76,30 @@ Suurimad teosed:
 
 **Lahknevus koodis:** `scripts/train_markup.py` docstring (read 12–13) väidab, et andmed tulevad kombineeritult `data/processed/` (136 lk, "vanem käsitsi märgendatud materjal") + `data/vutt/`, aga tegelik `DATA_SOURCES` muutuja (rida 55) sisaldab **ainult** `data/vutt/metadata.csv`. `data/processed/` (loodud märts 2026, sisaldab `*kursiiv*`-markupit) **ei ole** tegelikult 14.06 treeningus kasutatud, ehkki docstring seda väidab — docstring tuleks parandada või data/processed uuesti lisada.
 
+## Lühendusmärk → makron (VUTT ADR 0062, #533; 05.10.2026)
+
+`scripts/lyhend_makron_trukk.py` (kuivkäivitus vaikimisi, `--kirjuta`, `--test`)
+teisendas `data/lehekyljed/metadata.csv`, `metadata_markup.csv` ja `data/vutt/metadata.csv`:
+
+| | lehekyljed (kumbki CSV) | vutt |
+|---|---|---|
+| tilde/ülakriips → makron (märke) | 1 018 | 1 011 |
+| U+E8BF → `q;` (MUFI que-ligatuur; `q;` on andmestiku valitsev kuju, ~6 000×) | 53 | 3 |
+| U+F1A7 → `I` (kursiivne suur I, pildilt kontrollitud) | 1 | 0 |
+| kombineeriv märk rea alguses → maha | 2 | 1 |
+| kreeka tilde → U+0342 | 1 | 0 |
+| muutunud lehti (sh NFC: 666 lehte lagundatud aktsentidega) | 740 | 387 |
+
+Keelevalvurit ei olnud vaja: `data/vutt` 962/1120 lehe teose `languages` on valvurita,
+ülejäänud 158 on kärbitud kaustanimega 1626–1802 ladina/saksa teosed; `data/lehekyljed` `õ`-d
+on kõik lühendid. `build_vutt_dataset.py` rakendab sama `makroniks`-i igal ehitusel, v.a teosed,
+mille `languages` ∋ est/spa/por (need loetletakse). Mudeli väljundeid (`data/vutt/eval`,
+`reocr`) ei muudetud — `eval_print.py` ja `textmetrics.normaliseeri` võrdsustavad tilde ja makroni.
+
+**Jäi alles (otsustamata):** `Arrhenius-Ekman_De_iure_Dei_in_homines_1772.pdf_page_25/41`
+kreeka read on GT-s rämps (`didῦoV`, `ꝙλλὰ`) — kandidaadid välja jätmiseks.
+`ꝗ` (5×, prantsuse „qui") on MUFI-standardne märk ja jäi.
+
 ---
 
 ## Seotud, aga (veel) treeningus kasutamata
