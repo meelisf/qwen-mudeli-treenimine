@@ -449,6 +449,15 @@ kreeka tilde → U+0342), kõik NFC. `build_vutt_dataset.py` teeb sama igal uuel
 „ũ, ñ, õ – keep as is (tilde preserved)" → lühendusmärk = makron — KOOS mudeliga (§3.3),
 mitte varem. Detailid: `truki-andmestikud.md`.
 
+**Järgmise trükitreeningu andmestik `data/vutt_v2` (05.10.2026)** — snapshot
+`20261005T001501Z`, `--type print --keep-m-italics`: **1 488 lehte** (vana 1 120 + 368 uut,
+vanad kõik alles, holdout 20/20 sama tekstiga). Uutel lehtedel on märgendus tihedam:
+`<m>` 73 % lehtedest (vanadel 47 %), `<cs>` 25 % (17 %). Ehitaja rakendab
+`lyhend_makron_trukk.puhasta`-t (makron + prügi), tildet/prügi ei ole.
+Vahetus käsitsi treeningupäeval: `data/vutt` → `data/vutt_v1`, `vutt_v2` → `vutt`
+(vii `eval/` ja `reocr/` kaasa — eval_print loeb `data/vutt/...`). Enne treeningut:
+GT-kontroll 368 uuel lehel tootmismudeliga (GPU vaba pärast Kurrendi GT-kontrolli).
+
 ---
 
 ## 5. Mõõteriistad

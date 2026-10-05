@@ -26,12 +26,13 @@ import csv
 import shutil
 import re
 import unicodedata
+from collections import Counter
 from datetime import datetime
 from pathlib import Path
 
 from convert_marginalia import clean_markup
 from imaging import prepare_image, MAX_PIXELS
-from lyhend_makron import makroniks
+from lyhend_makron_trukk import puhasta
 from prompt import EMPTY_PAGE_MARKER
 
 # Terve lehekülje transkriptsioon võib ületada csv-mooduli vaikimisi
@@ -306,6 +307,7 @@ def main():
     skipped_empty = 0
     cleaned_markup = 0
     makron_pages = 0
+    makron_counts = Counter()
     makron_guarded = []    # valvuriga teose tildega lehed — käsitsi
     empty_pages = []        # korrektselt märgitud tühjad lehed
     empty_txt_pages = []    # Valmis, aga tekst puudub – kandidaat tühjaks
@@ -384,14 +386,16 @@ def main():
             if cleaned != transcription:
                 cleaned_markup += 1
             transcription = cleaned
-            # Lühendusmärk → makron (VUTT ADR 0062), välja arvatud valvuriga keeled
+            # Lühendusmärk → makron + prügi (VUTT ADR 0062; sama `puhasta` mis
+            # 1. etapi CSV-del), välja arvatud valvuriga keeled
             if guarded:
                 if "\u0303" in unicodedata.normalize("NFD", transcription):
                     makron_guarded.append(f"{work_dir.name}/{base}")
             else:
-                transcription, n_makron = makroniks(transcription)
-                if n_makron:
+                puhas = puhasta(transcription, makron_counts)
+                if puhas != transcription:
                     makron_pages += 1
+                    transcription = puhas
             if not transcription:
                 skipped_empty += 1
                 continue
@@ -437,7 +441,7 @@ def main():
     print(f"  Vahele jäetud (ei TXT):    {skipped_no_txt}")
     print(f"  Vahele jäetud (tühi tekst):{skipped_empty}")
     print(f"  Normaliseeritud/puhastatud markup: {cleaned_markup}")
-    print(f"  Lühendusmärk → makron: {makron_pages} lehte"
+    print(f"  Lühendusmärk → makron + prügi: {makron_pages} lehte {dict(makron_counts)}"
           f" (valvuriga keel, tilde jäi: {len(makron_guarded)})")
     for lk in makron_guarded[:20]:
         print(f"    valvur: {lk}")
