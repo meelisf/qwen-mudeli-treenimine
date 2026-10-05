@@ -502,6 +502,14 @@ ei tohi mälu järgi tsiteerida.
    **04.10:** põhjus leitud — osaline GT (tühjad TextLine-id + vale XML-versioon), §3.4d.
 7. **`train_on_responses_only` A/B** — praegu treenitakse 813-tokenist juhist
    kaasa; mediaanlehel ~67 % treenitud tokenitest.
+   **PLAANIS ööl 06.→07.10** (kasutaja otsus 06.10): A = `print-base-r64-mi-vl-20261006`
+   (treenitud 06.10 öösel, vana retsept, andmed `data/vutt` v2 + makron), B = SAMA käsk ja
+   SAMAD andmed, ainult `train_markup.py` collatorisse `train_on_responses_only=True`,
+   `instruction_part="<|im_start|>user\n"`, `response_part="<|im_start|>assistant\n"`
+   (nagu `train_kurrent.py` 325–327). Ainus muutuja = mask. B vajab eraldi nime (muidu
+   sama `DATE_STAMP`-i loogika annab uue kuupäeva, aga `_LIIK` sama — lisa nt `-ro`).
+   Makronireegel juhises: `logs/prompt-makron-20261006.patch` (B-l sama juhis kui A-l).
+   Võrdle holdouti CER/`cer_plain`/`<m>` ja Menii sondi, mitte kadu.
 8. **Tühjad/hõredad lehed** — trükikomplektis 0 näidet, juhis lubab
    `[tühi lehekülg]`. Kurrendi poolel juba tehtud.
 9. **`finish_reason == "length"`** jääb kliendis kontrollimata → kärbitud leht
