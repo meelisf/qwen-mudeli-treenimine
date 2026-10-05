@@ -17,3 +17,6 @@ read: 18908 → 17224  välja lehed ≥2 tühja TextLine'iga (tuhjad_read.csv); 
 ehitatud: 2026-10-04T21:07:33  scripts/build_kurrent_v4.py
 v3 17224 → 18973  {'−audit ≥2 tühja (kurrent_xix_zurich)': 999, '−audit ≥2 tühja (bullinger_autoren)': 1342, '−bullinger vana': 493, '−audit ≥2 tühja (koenigsfelden_adhr)': 3, '−audit ≥2 tühja (trolldomskommissionen_seg)': 19, '−dresdner vana': 238, '−dresdner holdout (tabel)': 1, '−xix matcher (DTA asemel)': 150, '+bullinger v3': 707, '+dta kosmos': 2463, '+escher puhtad': 567, '+dresdner v2': 164, '+dta lisa': 1093}  holdout −18 +20
 lühendusmärk → makron (ADR 0062, scripts/lyhend_makron.py): 4021 märki
+
+GT-kontroll: 2026-10-06T00:13:01  scripts/kurrent_gt_valja.py
+read: 18973 → 18846  välja 127 (data/kurrent/gt_kontroll/kurrent-20261002-Q8_0/valja.csv; {'erinev': 82, 'GT puudulik': 37, 'osaline GT': 8})

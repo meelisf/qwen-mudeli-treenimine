@@ -365,7 +365,7 @@ oli osaliselt vigase GT peal. Tagasivahetust pole vaja; järgmine treening v4-ga
 (nädalavahetus 10.–11.10). Zürichi täistekst on olemas (Zenodo 10517999),
 taastamine järgmises iteratsioonis.
 
-**Kontrollnimekiri: kohe kui GT-kontroll on valmis (~05.10 17:00)**
+**Kontrollnimekiri: kohe kui GT-kontroll on valmis (~05.10 17:00)** — sammud 1–6 TEHTUD 05.–06.10 (vt `kurrent-andmestikud.md` „GT-kontroll ja väljavõtt"); lahti ainult 7.
 
 1. Jooks lõppenud? `tail logs/gt-kontroll-20261004-1535.log`
    (viimane rida `[18775/18775]`), siis `venv/bin/python scripts/gt_kontroll.py --aruanne`.
@@ -392,7 +392,10 @@ taastamine järgmises iteratsioonis.
    keset lehte) — mudel ei ole neid käsi näinud, kõrge CER ei tõenda GT viga.
 5. Kandidaadid (2 + 4) välja `data/kurrent/metadata.csv`-st (skript on veel
    kirjutamata; holdout jääb puutumata), dokumenteeri `kurrent-andmestikud.md`-sse.
-6. `venv/bin/python scripts/train_kurrent.py --test --16bit` → rida `Andmestik:` = ridu miinus holdout 130 (18 843).
+6. `venv/bin/python scripts/train_kurrent.py --test --16bit` — NB: `--test` võtab ALATI 20 pikimat
+   näidet, rida `Andmestik:` näitab siis 20. Kontrolli, et `Hoiatus`/`Üle … tokeni` ridu ei ole ja
+   `Holdout: 130`; täisandmestik = metadata.csv 18 846 − 130 = **18 716**. Jõudega OCR-teenus hoiab
+   GPU-l ~26,5 GB → mudeli laadimine kukub `meta tensor`-iga; see on oodatav, testi treeningupäeval.
 7. Treening v4-ga nädalavahetusel 10.–11.10 (retsept §3.5; OCR-teenus maas, teavita kasutajaid).
    **Enne `train_kurrent`-i** (teenus on juba maas): `scripts/prompt.py` `KURRENT_INSTRUCTION`-isse
    reegel „lühendusmärk (rõhtjoon tähe kohal, nasaal/geminatsioon) = makron U+0304, mitte tilde"

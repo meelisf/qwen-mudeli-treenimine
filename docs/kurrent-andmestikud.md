@@ -515,17 +515,37 @@ käsi on relevantne, ebatraditsiooniline lehekuju aitab. ~pool päeva + kontroll
   automaatjoondus; lehe tasemel treeningusse ei sobi otse.
 - dh-unibe 1848+ kogud (Bundesratsprotokolle jms): kantseleikäsi, sama ühekülgsus mis Zürich.
 
-### Enne treeningut veel lahti
+### GT-kontroll ja väljavõtt (05.–06.10, tehtud)
 
-Vt SEIS §3.4d „Kontrollnimekiri".
-- GT-kontroll (jookseb `data/kurrent`-i peal, lõpp ~05.10 17:00): v2-st pärit
-  lehtedel CER ≥ 10 % = tugev GT-vea märk. Vaata iga allika kohta näiteid ENNE
-  hulgi väljaviskamist.
-- Uued lehed (DTA, Escher-lisa, Bullinger v3, Dresdner v2) läbi sama mudeli,
-  sõelu AINULT struktuurselt (väljund GT-st selgelt pikem, loop, GT algab keset
-  lehte) — mudel ei ole neid käsi näinud.
-- Toor-XML (`~/_kustutamiseks_20261002/hf_cache/`) **ära kustuta enne uut
-  treeningut**.
+Tootmismudel (`kurrent-20261002-Q8_0`) üle kogu v4 treeningkomplekti (18 843 lk,
+`scripts/gt_kontroll.py`, holdout väljas). CER ≥ 10 %: 1 403 kandidaati.
+
+CER on ridade järjekorrale tundlik — mitmeveeruline leht, marginaalia või tabel
+annab kõrge CER-i ka siis, kui sisu klapib. `scripts/gt_sonakate.py` võrdleb
+sõnahulka (recall/precision) ja klassifitseerib: sisu klapib 931, piiripealne 307,
+loop 37 (mudeli rike, GT korras) → jäävad; **välja 127**: erinev 82 (enamasti
+parandamata HTR-GT, kasutaja kinnitas pildilt aaeb 16388), GT puudulik 37,
+osaline GT 8. Väljavõtt: `scripts/kurrent_gt_valja.py --kirjuta` →
+`metadata.csv` 18 973 → 18 846, treeningule **18 716** (varukoopia `metadata.csv.bak`).
+
+Leiud allikate kaupa:
+- **aaeb_xiv_xvii** on ~99 % prantsuse keeles; jääb sisse (ladina kiri esineb ka
+  Kurrendi tekstides; 20261002 mudel loeb seda juba hästi, med 1,6 %). 59 lk välja.
+- **dresdner_1665** med 16,4 % on MUDELI viga: v2 vana TEI-ehitaja laiendused
+  („Churf ürstliche d urc hl aucht", tühik enne koma) on mudelis sees. GT õige;
+  `gt_sonakate` erand „osaline GT"-st. Uus treening peaks harjumuse kaotama —
+  vaata evalis.
+- **bullinger_autoren v3**: aadresslehtede kõrge CER = arhiivimärgid („S.", „1.")
+  GT-s, mida mudel ei loe. Toores HTR ainult 7 lehel (välja).
+- **dta_kosmos_1827**: loengukonspektide ridadevahelised lisandused → järjekord.
+- **vutt_horedad** kaitstud: tahtlikult peaaegu tühjad lehed (nt VUTT jbc88t lk 4
+  „2v") hallutsineerimise vastu. Mudel jätab harilikuga foliandi lugemata.
+- DTA holdout 20 lk (mudel vs GT, pikkused klapivad): CER 0,6–4,5 %, v.a
+  libelt_0291 15,5 % — diplomaatiline GT lühenditega („ud", „Thren"), mudel
+  laiendab. Kõik korras.
+
+Toor-XML (`~/_kustutamiseks_20261002/hf_cache/`) **ära kustuta enne uut
+treeningut**. Vana v2: `~/_kustutamiseks_20261005/data_kurrent_v2`.
 
 ---
 

@@ -12,6 +12,9 @@ precision = väljundi sõnadest GT-s) ja klassifitseeritakse:
                                               mõni mudeli hallutsinatsioon kaob kaasa)
   loop           mudeli rike, GT korras     → jääb
   vutt_horedad   ALATI jääb — tahtlikult peaaegu tühjad lehed
+  dresdner_1665  „osaline GT" ei kehti: 20261002 mudel õppis vana katkise
+                 TEI-ehitaja laiendused („Churf ürstliche d urc hl aucht") ja
+                 paisutab väljundit — GT on õige, valehäire
 
 Väljund: <gt_kontroll kaust>/sonakate.csv ja valja.csv.
 Käivitus: venv/bin/python scripts/gt_sonakate.py
@@ -45,7 +48,7 @@ def klass(allikas, rec, prec, liik):
         return "erinev"
     if prec < 0.6:
         return "GT puudulik"
-    if rec >= 0.95 and prec < 0.75:
+    if rec >= 0.95 and prec < 0.75 and allikas != "dresdner_1665":
         return "osaline GT"
     return "piiripealne"
 
