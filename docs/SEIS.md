@@ -8,20 +8,19 @@ Tööjaotus: **`SPIKKER.md` = kuidas asju käivitada.** **See fail = mida me
 teame ja mis seisus oleme.** Lõpetatud uurimused: `docs/arhiiv/` — neid ei
 uuendata ja osa järeldusi seal EI KEHTI.
 
-Viimati uuendatud: **31.08.2026**
+Viimati uuendatud: **06.10.2026**
 
 ---
 
 ## 1. Mis praegu tootmises jookseb
 
-> **Mõlemad mudelid on uued.** Trükipool alates 29.08 ~04:00, käsikirjapool
-> alates 31.08 04:20. Kasutaja katsetab käsikirjamudelit paar päeva enne
-> lõplikku otsust.
+> Trükipool `print-base-r64-mi-vl-20261006` alates 06.10 09:56 (koos makronijuhisega,
+> §4), käsikirjapool `kurrent-20261002` alates 04.10.
 
 | teenus | port | mudel | alates |
 |---|---|---|---|
-| `llama-server-print` | 8080 | `print-base-r64-mi-vl-20260828-Q8_0` | 29.08 |
-| `llama-server-hand` | 8081 | **`kurrent-20260829-Q8_0`** | 31.08 |
+| `llama-server-print` | 8080 | **`print-base-r64-mi-vl-20261006-Q8_0`** | 06.10 |
+| `llama-server-hand` | 8081 | **`kurrent-20261002-Q8_0`** | 04.10 |
 | `ocr-service` | — | klient mõlemale, `ENGINE_CONFIGS` = llamacpp | — |
 
 GPU 24,3 / 32,6 GB. Mõlemal serveril **`--image-max-tokens 5000`**, klient teeb
@@ -42,7 +41,8 @@ sudo systemctl start ocr-service
 
 | mudel | varukoopia |
 |---|---|
-| käsikiri → `kurrent-20260602` | `/etc/systemd/system/llama-server-hand.service.bak-20260829` |
+| käsikiri → `kurrent-20260829` | GGUF kettal; muuda unit'is `-m`/`--mmproj` |
+| trükk → `print-base-r64-mi-vl-20260828` | `/etc/systemd/system/llama-server-print.service.bak-20261006` + `git revert 8165e49` (makronijuhis) |
 | trükk → `print-base-r64-20260827` | GGUF kettal; `.bak-20260828` on veel vanem (`markup-20260722`) |
 
 **Serverit sondeerides pane `"chat_template_kwargs": {"enable_thinking": false}`
@@ -399,7 +399,8 @@ taastamine järgmises iteratsioonis.
 7. Treening v4-ga nädalavahetusel 10.–11.10 (retsept §3.5; OCR-teenus maas, teavita kasutajaid).
    **Enne `train_kurrent`-i** (teenus on juba maas): `scripts/prompt.py` `KURRENT_INSTRUCTION`-isse
    reegel „lühendusmärk (rõhtjoon tähe kohal, nasaal/geminatsioon) = makron U+0304, mitte tilde"
-   — GT on v4-s juba makroniga (VUTT ADR 0062). Teenus laeb juhise käivitusel `prompt.py`-st →
+   — GT on v4-s juba makroniga (VUTT ADR 0062). **Valmis patch:** `git apply logs/prompt-kurrent-makron-v4.patch`
+   (06.10; v4 kontrollitud: 18 846 rida, holdout 130, tilde 0, makron 5 135, NFC, pilte puudu 0). Teenus laeb juhise käivitusel `prompt.py`-st →
    juhis ja mudel lähevad tootmisse KOOS (§3.3); varem muutes saaks vana mudel uue juhise.
    NB: trüki-`INSTRUCTION` ütleb veel „ũ, ñ, õ – keep as is (tilde preserved)" — see muutub
    trükimudeli järgmise treeninguga (VUTT #533 samm 4), mitte nüüd.
@@ -421,14 +422,21 @@ Enne treeningut **kolm teenust maha** (`ocr-service llama-server-print
 llama-server-hand`) — ainult `ocr-service` ei ole piisav, GPU-l on ka kaks
 llama-serverit (~25 GB).
 
-**Kosmeetiline andmeviga, parandada:** `data/kurrent/metadata.csv` 2 039 real
-(aaeb 1 982 + jonkopings 57) puudub kolmas veerg `allikas`. Treening loeb ainult
-kahte esimest, aga `filter_dataset.py --stats` loeb neid „puuduva allikana".
-Nüüd on ohutu — treening on läbi.
+~~Kosmeetiline andmeviga (puuduv `allikas`-veerg)~~ — v4-s parandatud, kõigil 18 846 real 3 veergu (06.10).
 
 ---
 
-## 4. Trükimudel `print-base-r64-mi-vl-20260828`
+## 4. Trükimudel `print-base-r64-mi-vl-20261006` (tootmises 06.10)
+
+**Hindamine 06.10** (`logs/truki-v2-eval-20261006-0856.log`, skript `scripts/truki_v2_eval.sh`,
+Q8_0 vana vs uus, kumbki oma juhisega): holdout `cer_plain` 0,8 = 0,8 %, `<m>` F1 0,81 → 0,85,
+m_CER 9,8 → 8,1 %; Menii GGUF (`scripts/menii_gguf.py`) `<m>` 204 → 261, lehti 9 → 11/13
+(0027/0029: 0 → 38/35); lühend makroniga (tildeid 0); Toores 205 lk loope 7 = 7.
+**CER märgendusega 1,5 → 3,1 %** — kolm lehte, kus kursiivne põhitekst läheb `<i>`-sse, GT-s
+mitte (pildil ongi kursiiv). v2-s valdavalt-`<i>`-põhitekstiga lehti 91 → 183 (43 → 69 teost):
+VUTT-i konventsioon ebaühtlane, otsus kasutajal. Vahetus `scripts/truki_v2_tootmisse.sh`.
+
+### 4.0 Eelmine: `print-base-r64-mi-vl-20260828`
 
 Eelkäija `print-base-r64-20260827` võit oli päris (CER 5,0 → 2,0 %, `<m>`
 75 → 170, `<cs>` 1 → 16), **aga katse oli neljakordselt confounded**: korraga
