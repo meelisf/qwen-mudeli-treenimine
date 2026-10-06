@@ -148,9 +148,13 @@ def main():
     # Lühendusmärk → makron kõigis ridades, sh holdout (ADR 0062). makroniks
     # tagastab NFC — rakendatakse KÕIGILE, sest lahutatud „e + U+0304" ja „ē" on
     # mudelile kaks eri järjestust (Königsfelden, Hanse, Senats).
+    # Pikk s → s kõigis ridades (06.10): ſ oli ainult senats/dresdner/osa xix-ist
+    # (445/18 846 lehte), juhis käskis ſ-i — mudel nägi vastuolu. Kurrendis on
+    # pikk s niikuinii reegel, VUTT-i toimetajad seda ei erista.
     mk, nfc = Counter(), 0
     for i, r in enumerate(out):
         t, n = makroniks(r[1])
+        t = t.replace("ſ", "s")
         mk[r[2]] += n
         if t != r[1]:
             nfc += not n

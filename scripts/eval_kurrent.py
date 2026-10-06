@@ -444,8 +444,9 @@ tulemused = []
 for allikas, failinimi, hyp in rows:
     # Lühendusmärk tilde ≡ makron (VUTT ADR 0062): GT on alates v4-st makroniga,
     # vanemad mudelid kirjutavad tilde — muidu oleks CER-i erinevus kunstlik.
-    ref = makroniks(gt[failinimi].strip())[0]
-    hyp = makroniks(hyp)[0]
+    # Pikk s ≡ s (06.10): GT on alates v4 pikk-s-ühtlustusest s-iga.
+    ref = makroniks(gt[failinimi].strip())[0].replace("ſ", "s")
+    hyp = makroniks(hyp)[0].replace("ſ", "s")
     ratio = len(hyp) / max(len(ref), 1)
     tulemused.append({
         "failinimi": failinimi, "allikas": allikas,

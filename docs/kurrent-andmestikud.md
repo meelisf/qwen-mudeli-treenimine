@@ -581,3 +581,12 @@ XVIII saj  svea_hovratt_seg, krigshovrattens_seg jt (Rootsi, jätkuvad)
 XIX saj    kurrent_xix (Šveits/Saksamaa, 8 000 lk – suurim)
            koenigsfelden_adhr (34 lk)
 ```
+
+## Pikk s → s (2026-10-06)
+
+`metadata.csv` 445 lehel ſ → s (senatsprotokolle 229, dresdner_1665 165, xix_read_dateerimata 51;
+muudes allikates ſ-i ei olnud — DTA ehitaja tegi ſ → s juba varem). Põhjus: Kurrendi juhis käskis
+ſ-i, aga 97,6 % treeninglehtedest kirjutas s-i, mudel nägi vastuolu. Ühtlustus läheb koos juhise
+muudatusega (`logs/prompt-kurrent-makron-v4.patch`) järgmisesse treeningusse. Varukoopia
+`data/kurrent/metadata.csv.bak-pikk-s-20261006`; muutus kontrollitud: `sed s/ſ/s/g` varukoopiast = uus fail.
+`build_kurrent_v4.py` teeb sama, `eval_kurrent.py` võrdsustab ſ ≡ s.
