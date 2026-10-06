@@ -24,7 +24,8 @@ Instructions:
    - ö, ä, ü, õ – always use modern form
    - uͤ, oͤ, aͤ (letter + superscript e) – transcribe as ü, ö, ä
    - å, Å (Swedish) – keep as is
-   - ũ, ñ, õ – keep as is (tilde preserved)
+   - abbreviation stroke over a letter (nasal or doubled consonant: ā ē ī ō ū m̄ n̄) – combining macron U+0304, never tilde
+   - ñ (Spanish) and õ (Estonian) are letters, not abbreviations – keep as is
 6. Special characters:
    - ſ (long s) – transcribe as ſ
    - ß (double s) – transcribe as ß
