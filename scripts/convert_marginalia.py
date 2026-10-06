@@ -176,6 +176,24 @@ def convert(text: str) -> str:
     return "".join(result_parts)
 
 
+_M_EDGE_WS_START = re.compile(r"^(\s*<m>(?:<(?:i|b|cs|hi)>)*)[ \t]+", re.MULTILINE)
+_M_EDGE_WS_END = re.compile(r"[ \t]+((?:</(?:i|b|cs|hi)>)*</m>\s*)$", re.MULTILINE)
+
+
+def strip_m_edge_whitespace(text: str) -> str:
+    """Eemaldab ploki-rea servatühiku: `<m> <i>x</i></m>` → `<m><i>x</i></m>`.
+
+    VUTT-i korpuses oli see ~3 255 real (vana süntaksi teisendus), 23 % trüki-GT
+    `<m>`-idest — mudel `20261006` õppis ja kirjutas iga marginaaligrupi esimese
+    rea tühikuga. VUTT normaliseerib sama salvestusel (`marginalia_normalize`,
+    ADR 0003 täiendus 2026-10-06); see on treeningupoolne koopia.
+    Ainult rea alguses olev `<m>` / rea lõpus olev `</m>` — rea-keskne inline-`<m>`
+    jääb puutumata.
+    """
+    text = _M_EDGE_WS_START.sub(r"\1", text)
+    return _M_EDGE_WS_END.sub(r"\1", text)
+
+
 def remove_empty_m_tags(text: str) -> str:
     """Eemaldab tühjad <m>...</m> tagid (nt <m></m>, <m><i></i></m>)."""
     def _is_empty(content: str) -> bool:
@@ -432,6 +450,7 @@ def clean_markup(text: str, keep_marginalia_italics: bool = False) -> str:
         cleaned = balance_line_m_tags(cleaned)
         if not keep_marginalia_italics:
             cleaned = strip_italics_in_marginalia(cleaned)
+        cleaned = strip_m_edge_whitespace(cleaned)
         cleaned = remove_empty_m_tags(cleaned)
         cleaned = remove_empty_tags(cleaned)
         if cleaned == text:
