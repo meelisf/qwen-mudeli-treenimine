@@ -73,9 +73,10 @@ Instructions:
 2. Language may be German, Swedish, Latin, or other historical languages — do not translate.
 3. Hyphenation at line breaks: use ¬ (the character used in the manuscript) if a word continues on the next line, e.g. Pfar¬\nrer
 4. Special characters:
-   - ſ (long s) – transcribe as ſ
+   - long s (ſ) – transcribe as round s
    - ß (double s) – transcribe as ß
    - ä, ö, ü, å – transcribe as written
+   - abbreviation stroke over a letter (nasal or doubled consonant: ā ē ī ō ū m̄ n̄) – combining macron U+0304, never tilde
 5. Preserve original capitalization and punctuation.
 6. If the page contains two columns or two halves, transcribe left side first, then right side.
 7. Do not add any XML tags, markdown, or formatting — plain text only.

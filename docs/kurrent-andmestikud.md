@@ -679,5 +679,12 @@ Bullingeri kõrval. Läheb v5-sse (v4 treening käib 09.–11.10).
 - **Edasi otsida: editsioon + faksiimile lehe kaupa** (nagu Bullinger, Gwalther):
   e-manuscripta.ch transkriptsioonid (ZB Zürich, palju ladina kirju), Clusiuse
   kirjavahetus (Huygens, 16. saj ladina), Linné kirjavahetus (Alvin, faksiimile +
-  transkriptsioon, eksport teadmata). Meie treening on lehetasemel → reajoondust
-  pole vaja, piisab lehe pildist + diplomaatilisest lehetekstist.
+  transkriptsioon, eksport teadmata).
+  **NÕUE kõigile GT-allikatele:** treening on lehetasemel (mudel ei tee
+  reatuvastust), aga GT säilitab pildi READ ja reavahetused — väljundi rida =
+  pildi rida. Editsioon ilma diplomaatiliste reavahetusteta EI sobi otse
+  (sama probleem mis Zürichi Zenodo täistekstil); vaja reajoondust või
+  reavahetustega transkriptsiooni. Kontrolli seda iga kandidaadi puhul ESIMESENA.
+  Gwalther (Stotzi e-manuscripta tekst kopeeriti rida-realt Transkribuse
+  joontesse) viitab, et e-manuscripta transkriptsioonides võivad read olla
+  säilinud — kontrollida.
