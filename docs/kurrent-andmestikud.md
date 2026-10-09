@@ -510,9 +510,9 @@ käsi on relevantne, ebatraditsiooniline lehekuju aitab. ~pool päeva + kontroll
 ### Vaadatud 04.10, mitte kasutusel
 
 - Zenodo 17252677 pages/: uusi lehti ~27 (Auerbach, Erbkam, Baieri Schriftkunde) — liiga vähe.
-- `DenisaBumba/htr_leibniz_dataset_v1`: Leibniz, XVII saj ladina/prantsuse
-  õpetlaskäsi — VUTT-i jaoks väga asjakohane, aga reataseme ja osaliselt
-  automaatjoondus; lehe tasemel treeningusse ei sobi otse.
+- ~~`DenisaBumba/htr_leibniz_dataset_v1`: … lehe tasemel treeningusse ei sobi otse.~~
+  VALE (parandatud 09.10): lehepildid + PAGE XML on repos olemas, „clean" osa
+  käsitsi parandatud → vt „Ladina käsikirja auk (2026-10-09)".
 - dh-unibe 1848+ kogud (Bundesratsprotokolle jms): kantseleikäsi, sama ühekülgsus mis Zürich.
 
 ### GT-kontroll ja väljavõtt (05.–06.10, tehtud)
@@ -590,3 +590,94 @@ muudes allikates ſ-i ei olnud — DTA ehitaja tegi ſ → s juba varem). Põhju
 muudatusega (`logs/prompt-kurrent-makron-v4.patch`) järgmisesse treeningusse. Varukoopia
 `data/kurrent/metadata.csv.bak-pikk-s-20261006`; muutus kontrollitud: `sed s/ſ/s/g` varukoopiast = uus fail.
 `build_kurrent_v4.py` teeb sama, `eval_kurrent.py` võrdsustab ſ ≡ s.
+
+## Ladina käsikirja auk (2026-10-09)
+
+### Keeleline koostis v4-s
+
+Keel hinnatud lehe tekstist funktsioonisõnade järgi (metadata.csv-s keeleveergu
+pole; skript `/tmp/keeled.py`, ligikaudne). Treening 18 716 lk:
+
+| keel | lehti | % | põhiallikas |
+|---|---|---|---|
+| saksa | 12 555 | 67,1 | xix, DTA, hanse, senats, dresdner |
+| rootsi | 3 451 | 18,4 | Riksarkivet (Svea, Göta, Bergskollegium, Trolldom…) |
+| prantsuse | 1 866 | 10,0 | aaeb_xiv_xvii (1 848) |
+| ladina | 514 | 2,7 | **bullinger_autoren (421)** — üks 16. saj ring |
+| hollandi | 84 | 0,4 | hanse_kurrent_xvi |
+| eesti | 4 | ~0 | — |
+
+Holdout 130: saksa 91, rootsi 28, prantsuse 10, **ladina 1** → holdout-CER ei
+näe ladina regressiooni üldse. Segalehti (teine keel ≥ 25 %) 466, sh de+la 50.
+
+VUTT-i käsikirjad on suures osas ladinakeelsed (17. saj õpetlaste ladina
+kursiiv, ladina sõnad antiikvas keset Kurrenti) — see osa jäi seni kahe silma
+vahele. Kontrollitud VUTT-i ladina käsikirja-GT-d praktiliselt ei ole (Fischeri
+kirjad osaliselt üle vaadatud, toored).
+
+### Alla laaditud (09.10), `data/raw_xml/`
+
+**Leibniz** — `DenisaBumba/htr_leibniz_dataset_v1` (HF; ka Zenodo 21622297),
+CC BY 4.0. ERC PHILIUMM, 17. saj lõpp – 18. saj algus; filosoofia, füüsika,
+kirjad, mustandid ja puhtandid. HF parquet on reatasemel, aga **lehepildid +
+PAGE XML on samas repos** (`train/clean/`, `val/`) — 04.10 märge „lehe tasemel
+ei sobi" oli vale. Võetud AINULT „clean" (käsitsi parandatud, eScriptorium);
+„noisy" (735 lk) = editsiooni automaatjoondus FoNDUE-GD-v2 väljundile → Matcheri
+risk, välja. Allalaadimine: `hf download … --include "train/clean/**" "val/*"`
+(`train/clean/*` ei toiminud).
+
+**Gwalther** — Zenodo 4780947, Ms D 152 ZB Zürich „Lateinische Gedichte"
+1540–80, Peter Stotzi transkriptsioon e-manuscriptast, read käsitsi kopeeritud
+Transkribuse joontesse. **CC BY-NC 4.0** (repo LICENSE; Zenodo kirje ütleb
+„other-open") — mittekaubanduslik, akadeemiline kasutus sobib. Kaustas ka
+`alto/`, `txt/`, `img/`.
+
+### Audit (`scripts/audit_ladina.py` → `data/kurrent_xix_audit/ladina_audit.csv`)
+
+| | Leibniz clean | Leibniz val | Gwalther |
+|---|---|---|---|
+| lehti / ridu | 248 / 18 261 | 27 / 1 878 | 142 / 4 040 |
+| looja | eScriptorium | eScriptorium | Transkribus |
+| tühje ridu (0 / 1 / ≥2) | 248 / 0 / 0 | 27 / 0 / 0 | 139 / 3 / 0 |
+| keel | la 218, fr 30 | la 26, fr 1 | la 141 |
+| marginaaliregiooniga lehti | 139 | 16 | 0 |
+| pilt puudu | 0 | 0 | 0 |
+
+Mõlemad puhtad. Ehitamisel lahendada:
+
+- **Maha tõmmatud tekst** on Leibnizi GT-s märgendita sees („De De conversione",
+  „vehe vehemens"); kordusheuristik leiab selle 163/248 lehel. **Kasutaja otsus
+  09.10: sobib** — väljakirjutamine ei sega üleliia, VUTT-is saab käsitsi
+  märgendada. Lehti välja EI võeta.
+- **Regioonid:** `MarginTextZone` 440 (139 lehel) — lugemisjärjekord ja
+  marginaalide paigutus nagu teistel allikatel; `DigitizationArtefactZone`
+  (värviskaala, joonlaud) välja; `NumberingZone` (foliant) — sama reegel mis
+  teistel allikatel.
+- **Pikkus:** Leibnizi leht on tihe — mediaan 3 210 tähte (Kurrendi v4: 1 181,
+  p99 3 437), p95 8 351, max 15 548; 34 lehte > 6 000 tähe. `train_kurrent.py`
+  jätab `MAX_SEQ = 8192` ületavad välja — kontrolli ehitusel, mitu jääb.
+- Leibniz val (27) → holdout-kandidaat ladina jaoks (eraldi alam-CER), aga
+  VUTT-i enda ladina eval (Fischeri kirjad, 15–20 lk käsitsi parandatud) on
+  vajalik — välisallikas üksi ei näita, kas lapp VUTT-is aitab.
+
+Mõju: +417 lk (275 + 142) → ladina ~2,7 % → ~5 %, teine ja kolmas käsi
+Bullingeri kõrval. Läheb v5-sse (v4 treening käib 09.–11.10).
+
+### Otsitud 09.10, ladina käsikiri ≥ 1520
+
+- **HTR-United kataloog** (138 kirjet, filter lat + notAfter ≥ 1520): uus ainult
+  **Gasparo Sardi „Toponomasia"** (FoNDUE, 1561–70, 49 lk,
+  github.com/PaulineJac/GasparoSardiToponomasia/tree/main/HTR) — kontrollimata,
+  järgmine kandidaat. Ülejäänu trükis, keskaeg või meil juba olemas.
+- **Bullingeri täiskogu** (`pstroe/bullinger-htr`, 165 673 rida, `la/` kaust):
+  Text2Image automaatjoondus + ainult read → välja (sama risk mis Matcher).
+- **CATMuS Modern**: käsitsi kirjutatud ladina ridu 0 → kasutu.
+- HF otsing („latin handwrit/htr/manuscript", Riksarkivet, Kansallisarkisto):
+  ladina käsikirja-GT-d ei ole.
+- Transkribuse avalikud mudelid (Latin Humanistic 17th c. = Maieri 60 lk,
+  Acta_17 de/nds/la) — GT ei ole avalik.
+- **Edasi otsida: editsioon + faksiimile lehe kaupa** (nagu Bullinger, Gwalther):
+  e-manuscripta.ch transkriptsioonid (ZB Zürich, palju ladina kirju), Clusiuse
+  kirjavahetus (Huygens, 16. saj ladina), Linné kirjavahetus (Alvin, faksiimile +
+  transkriptsioon, eksport teadmata). Meie treening on lehetasemel → reajoondust
+  pole vaja, piisab lehe pildist + diplomaatilisest lehetekstist.
