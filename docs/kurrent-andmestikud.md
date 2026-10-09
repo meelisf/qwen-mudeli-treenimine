@@ -714,3 +714,24 @@ sageli üheks lõiguks; read on ainult ALTO-s.
 Järeldus: e-manuscripta ei lappi ladina auku. Toores Baseli HTR (sadu ladina kirju,
 16.–17. saj) võiks olla toorik käsitsi parandamiseks, aga see on sama töö mis
 VUTT-i oma lehtede parandamine.
+
+## Plaan: Klingeri kirjad + Riegeri Briefbuch (2026-10-10, planeerimisel)
+
+Idee: Tartu Klingeri kirjad VUTT-i (`klingeriana`, osa digiteerimata); Rieger 1896
+„Briefbuch zu F. M. Klinger" (VUTT MCP kirjanduse kogu `FMG8W5MN`, 316 lk) annab teksti,
+aga reavahetusi pole → mudel annab read, Riegeri tekst klapitatakse peale → Klingeri käe GT.
+
+Proov (kiri 3.10.1816, VUTT `xcqbk3` lk 1 ↔ Briefbuch PDF 194–195, kiri CLXXVI):
+- Rieger piisavalt diplomaatiline: lühendid alles (`Ew Hochw.`, `u`, `U.`, `Conf:` —
+  ADR 0062-ga vastuolu pole), originaalortograafia, terviktekst koos P.S.-iga.
+  Toimetaja lisandid eemaldatavad: `[Eingeflickt: …]`, `*`/`**` allmärkused, nr + päis.
+- MCP-teksti fraktuuri-OCR katki: ſ → f süsteemselt (pöördumatu), prügi, poolitused,
+  allmärkused põhiteksti vahel → Briefbuch OCR-ida UUESTI ſ-i eristava mudeliga.
+- VUTT-i klingeriana on v1 OCR (väga vigane) → ankruteks v4+ väljund. Esimene samm
+  pärast v4-t: 22 olemasolevat klingeriana teost üle → ka Klingeri käe CER.
+
+Matcheri õppetund (vt „Ülevaatus 2026-10-04"): klapitus peab rikke NÄHTAVAKS tegema —
+leht sisse ainult kui iga mudelirida sai vaste ja Riegeri lehe tekstist ei jäänud
+midagi üle; reakaupa sarnasusskoor (Leibniz: ≥ 0,7, pikkus 80–100 %); mudel jätab
+ridu vahele → naaberreale liimitud tekst püüda reapikkuse kontrolliga. Klingeri eval
+(~20 käsitsi kontrollitud lehte) eraldada ENNE treeningut.
