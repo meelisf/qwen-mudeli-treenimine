@@ -688,3 +688,29 @@ Bullingeri kõrval. Läheb v5-sse (v4 treening käib 09.–11.10).
   Gwalther (Stotzi e-manuscripta tekst kopeeriti rida-realt Transkribuse
   joontesse) viitab, et e-manuscripta transkriptsioonides võivad read olla
   säilinud — kontrollida.
+
+### e-manuscripta.ch kontrollitud (09.10) — suurt ladina allikat EI OLE
+
+Liides: lehe ALTO `/{inst}/download/fulltext/alto/{lehe-id}` (TextLine'id päris
+reageomeetriaga), lihttekst `/{inst}/download/fulltext/plain/{id}`, lehe-ID-d
+IIIF manifestist `/i3f/v21/{nimetuse-id}/manifest`. Otsingutahud kehtivad üksikult
+(`?query=quod&facets=language%3D%22lat%22`, lehitsemine `&offset=11`), kombineerida
+ei saa.
+
+Ladina + täistekst: **773 nimetust** (Basel UB `bau` 718, Zürich ZB `zuz`/`zuzcmi` 46,
+muud 9). AGA tahk „Transkriptionen vorhanden" (`ftmode=ocr`) EI tähenda inimese
+transkriptsiooni: Baseli kirjad (Amerbach, Buxtorf, Rüeger) on **toores HTR**
+(„nalitudinem", „Isso dunusui oxodunu"), samuti Scheuchzeri, Halleri ja Lavateri
+kirjad Zürichis. Olekuvälja (parandatud/automaatne) ei ole.
+
+Eristustunnus: inimese tekst, mis on käsitsi Transkribuse reakastidesse kopeeritud,
+annab ALTO-s sõnakasti = reakasti (HPOS sama); HTR annab sõnapõhised kastid.
+Klassifikaator (sessiooni scratchpad, mitte repos) 55 mitte-Baseli nimetusel:
+inimese tunnusega ainult üksikud — Gwalther (juba käes), [Gebetbuch] 3033359
+(keskaegne raamatukäsi, Vulgata), Musculuse kiri 3223071 (1 kiri, tekstis toimetaja
+lisandid nagu „Argentinâ Strassburg"), Bodmer 1183251 (8 lk). Lihttekst liidab read
+sageli üheks lõiguks; read on ainult ALTO-s.
+
+Järeldus: e-manuscripta ei lappi ladina auku. Toores Baseli HTR (sadu ladina kirju,
+16.–17. saj) võiks olla toorik käsitsi parandamiseks, aga see on sama töö mis
+VUTT-i oma lehtede parandamine.
