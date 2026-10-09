@@ -64,6 +64,55 @@ jäävad alati.
 `models/checkpoints-*` (~9 GB) on treeningu jätkamispunktid, lõppadapterid on
 neist eraldi; suuresti surnud kaal, kustutamine on eraldi otsus.
 
+### 1.2 Masina seis: draiver ja CUDA (09.10.2026)
+
+**Üks draiver, üks toolkit.** Ubuntu `nvidia-driver-580-open` **580.178.04**
+(kernel `7.0.0-38`), CUDA toolkit **12.8** kaustas `/usr/local/cuda-12.8`
+(`.bashrc` PATH, `ld.so.conf` järjekorras esimene). Seda kasutavad KÕIK:
+llama.cpp (`CMAKE_CUDA_COMPILER=/usr/local/cuda-12.8/bin/nvcc`), treeningu venv
+(torch `2.10.0+cu128`, unsloth 2026.5.8) ja ocr-service.
+
+**Mis oli valesti.** Draiver ja 12.8 olid omal ajal paigaldatud NVIDIA CUDA
+repost (RTX 5090 vajas alguses 570+ ja CUDA 12.8-t), kõrval Ubuntu
+`nvidia-cuda-toolkit` 12.4 (omas `/usr/bin/nvcc`-d, keegi ei kasutanud).
+Repo oli välja lülitatud, paketid jäid. Ubuntu 580.178 pakend jagab faile
+teisiti: `apt upgrade` jättis NVIDIA kinni (kept back), `full-upgrade` kukkus
+kaks korda —
+- `libnvidia-opticalflow.so.1`: CUDA repos `libnvidia-compute`, Ubuntus
+  `libnvidia-decode` → `--force-overwrite`;
+- uus `libnvidia-gl-580` **Conflicts** `libnvidia-egl-gbm1` (CUDA repo) →
+  `dpkg -r --force-depends libnvidia-egl-gbm1`, siis `dpkg -i --force-overwrite`.
+- **`apt --fix-broken install` pakkus `nvidia-driver-580-open` EEMALDAMIST**
+  (järgmine `autoremove` oleks viinud ka DKMS-i) — keelduda, paigaldada
+  vahemälu `.deb`-id otse dpkg-ga.
+
+**Koristatud 09.10:** 12.4 toolkit + runtime-teegid, `nvidia-settings`/
+`libxnvctrl0` 610, vanad EGL/gpucomp/püsivara 159, `cuda-keyring`,
+`cuda-ubuntu2404-x86_64.list.disabled`. Alles: 12.8 toolkit (44 paketti,
+„local" — väljalülitatud repost, aga draiveriga konfliktita), `nvidia-modprobe`
+610 (`apt-mark manual`; loob `/dev/nvidia-uvm`-i, Ubuntus asendust pole).
+`rc`/`ic` konfijäägid (vanad kernelimoodulid, `nvidia-persistenced` 610) kahjutud.
+
+**Persistence mode on nüüd VÄLJAS** — Ubuntu `nvidia-persistenced` käivitub
+`--no-persistence-mode`-ga (CUDA repo oma lülitas sisse). Teenustele/treeningule
+ükskõik (töötav protsess hoiab GPU lahti); tagasi = systemd drop-in.
+
+**Järgmine samm: draiver 595-open** (`ubuntu-drivers devices` soovitab
+`nvidia-driver-595-open`; saadaval ka 580/595/615 + server). 580 on pika toega
+haru ja toetab CUDA 13.0-ni — torch `cu128` + llama.cpp 12.8 jaoks pole
+595-st sisulist kasu (kiiruse määravad CUDA teegid, mitte draiveri haru).
+Vahetama peaks (a) enne CUDA 13.x torch/llama.cpp peale minekut, (b) et püsida
+Ubuntu soovitatud rajal. **Teha pärast Kurrendi v4 treeningut + hindamist, mitte
+enne/ajal.** Käik: teenused maha → `sudo apt install nvidia-driver-595-open`
+(peab eemaldama 580 metapaketi, MITTE midagi `cuda-*-12-8`) → reboot → kontroll:
+`nvidia-smi` draiver = moodul, `loss-voimsuspiirid` (450 W, `no_turbo=1`),
+torch GPU-arvutus, `import unsloth`, llama-teenused käivituvad + `/health`,
+üks OCR-proov. Vana/uue mudeli holdout-võrdlus samal draiveril.
+
+**Kontrollimata 09.10:** kas llama-teenused **käivituvad** puhastatud
+süsteemiga (jooksid mällu laetud teekidega; `ldd` ahel terve). Esimene
+käivitus pärast treeningut on see kontroll.
+
 ---
 
 ## 2. Kindlaks tehtud
@@ -542,6 +591,16 @@ ei tohi mälu järgi tsiteerida.
     **04.10:** jooks käib (`scripts/gt_kontroll.py`, ~25 h, lõpp ~05.10 17:00).
     Vahetulemusest leitud süsteemne viga → §3.4d, andmestik v4. Pärast jooksu:
     allikate kaupa näidised üle, siis kandidaadid v4-st välja.
+
+12. **Masina koristus pärast Kurrendi v4 treeningut** (09.10 kokku lepitud):
+    (a) `~/_kustutamiseks_20261002/hf_cache/` (85 GB, toor-XML) — alles PÄRAST
+    treeningut; (b) vahemälud `~/.cache/pip` 25 GB, `~/.cache/uv` 16 GB,
+    `~/.cache/huggingface` muu kui `models--unsloth--Qwen3.5-9B` (baasmudel,
+    JÄÄB); (c) kasutaja otsustab: `qwen-treening`, `~/kraken-test`, `~/.pyenv`,
+    väikesed `ERR-rel`, `pagexml-to-alto`, `jaanson`, `trocr`, `AUTO-OCR`,
+    `gemini-cli`, `~/.paddlex`; (d) draiver 595-open (§1.2).
+    Tehtud 09.10: `disp`, `tartu-acad`, `vanad - VUTT…`, `HTRflow-riksarkivet`,
+    `EstLLM-finetune` kustutatud (279 GB); CUDA koristus §1.2.
 
 Punktid 5, 7, 9, 10 pärinevad
 `docs/arhiiv/treening-ja-inferentsi-koodi-ulevaade-20260828.md`-st.
