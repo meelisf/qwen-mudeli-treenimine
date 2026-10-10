@@ -602,5 +602,18 @@ ei tohi mälu järgi tsiteerida.
     Tehtud 09.10: `disp`, `tartu-acad`, `vanad - VUTT…`, `HTRflow-riksarkivet`,
     `EstLLM-finetune` kustutatud (279 GB); CUDA koristus §1.2.
 
+13. **Kurrendi v5 andmestik — mis ootab sisselülitamist** (kirja pandud 10.10,
+    v4 treeningu ajal). Järgmine Kurrendi ehitus = v4 + järgmised allikad:
+    (a) **Leibniz clean** 248 lk, `DenisaBumba/htr_leibniz_dataset_v1`, CC BY 4.0;
+    (b) **Gwalther** 142 lk, Zenodo 4780947, CC BY-NC 4.0;
+    (c) **Leibniz val** 27 lk → ladina holdout (eraldi alam-CER), mitte treeningusse.
+    Toorikud `data/raw_xml/leibniz` + `gwalther` (gitis EI OLE — ära koorista §12 käigus),
+    audit `scripts/audit_ladina.py`, detailid ja ehitusel lahendada (`MarginTextZone`,
+    `DigitizationArtefactZone` välja, `MAX_SEQ = 8192` ületavad lehed):
+    `kurrent-andmestikud.md` „Ladina käsikirja auk (2026-10-09)".
+    Ehitusskript on kirjutamata. Enne treeningut veel: VUTT-i oma ladina eval
+    (Fischeri kirjad, 15–20 lk käsitsi parandatud); Klingeri käsi (VUTT #576,
+    Riegeri klapitus + Valmis-aadresslehed) — kui valmis, samasse ehitusse.
+
 Punktid 5, 7, 9, 10 pärinevad
 `docs/arhiiv/treening-ja-inferentsi-koodi-ulevaade-20260828.md`-st.
