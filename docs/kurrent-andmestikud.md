@@ -656,11 +656,11 @@ Mõlemad puhtad. Ehitamisel lahendada:
 - **Pikkus:** Leibnizi leht on tihe — mediaan 3 210 tähte (Kurrendi v4: 1 181,
   p99 3 437), p95 8 351, max 15 548; 34 lehte > 6 000 tähe. `train_kurrent.py`
   jätab `MAX_SEQ = 8192` ületavad välja — kontrolli ehitusel, mitu jääb.
-- Leibniz val (27) → holdout-kandidaat ladina jaoks (eraldi alam-CER), aga
+- Leibniz val (27) → 10 holdout (ladina alam-CER) + 17 treeningusse (10.10), aga
   VUTT-i enda ladina eval (Fischeri kirjad, 15–20 lk käsitsi parandatud) on
   vajalik — välisallikas üksi ei näita, kas lapp VUTT-is aitab.
 
-Mõju: +417 lk (275 + 142) → ladina ~2,7 % → ~5 %, teine ja kolmas käsi
+Mõju: +407 lk (248 + 17 val + 142; 10 val → ladina holdout, kasutaja 10.10) → ladina ~2,7 % → ~5 %, teine ja kolmas käsi
 Bullingeri kõrval. Läheb v5-sse (v4 treening käib 09.–11.10).
 
 ### Otsitud 09.10, ladina käsikiri ≥ 1520

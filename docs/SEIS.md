@@ -606,7 +606,9 @@ ei tohi mälu järgi tsiteerida.
     v4 treeningu ajal). Järgmine Kurrendi ehitus = v4 + järgmised allikad:
     (a) **Leibniz clean** 248 lk, `DenisaBumba/htr_leibniz_dataset_v1`, CC BY 4.0;
     (b) **Gwalther** 142 lk, Zenodo 4780947, CC BY-NC 4.0;
-    (c) **Leibniz val** 27 lk → ladina holdout (eraldi alam-CER), mitte treeningusse.
+    (c) **Leibniz val** 27 lk → **10 ladina holdout-lehte** (eraldi alam-CER), **17 treeningusse**
+        (kasutaja 10.10: 27 on väärtusliku materjali jaoks liiga palju). Valik ehitusel
+        fikseeritud seemnega, eri dokumentidest, ainult ladina lehed; nimekiri kirja.
     Toorikud `data/raw_xml/leibniz` + `gwalther` (gitis EI OLE — ära koorista §12 käigus),
     audit `scripts/audit_ladina.py`, detailid ja ehitusel lahendada (`MarginTextZone`,
     `DigitizationArtefactZone` välja, `MAX_SEQ = 8192` ületavad lehed):
