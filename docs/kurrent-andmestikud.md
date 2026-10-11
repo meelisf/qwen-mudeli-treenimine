@@ -375,7 +375,7 @@ see, mille täidetud ridade arv = GT ridade arv.
 | Escher-lisa | `tuhjad_read.csv` | ainult ≤1 tühi |
 | vutt_horedad | VUTT „Valmis" (inimese kinnitatud) | — |
 
-Toor-XML (kohalik): `~/_kustutamiseks_20261002/hf_cache/` (xix, hanse),
+Toor-XML (kohalik): xix + hanse `hf_cache` kustutatud 11.10 (uuesti: HF-st alla),
 `data/raw_xml/riksarkivet/` (HF cache), `data/raw_xml/ubtue-gt/`,
 `data/raw_xml/hofdiarium1665.xml`, `data/raw_xml/dta_komplett/`,
 `data/raw_xml/zh_rrb/` (Zürichi editsioon, vt allpool).
@@ -544,8 +544,8 @@ Leiud allikate kaupa:
   libelt_0291 15,5 % — diplomaatiline GT lühenditega („ud", „Thren"), mudel
   laiendab. Kõik korras.
 
-Toor-XML (`~/_kustutamiseks_20261002/hf_cache/`) **ära kustuta enne uut
-treeningut**. Vana v2: `~/_kustutamiseks_20261005/data_kurrent_v2`.
+Toor-XML (`~/_kustutamiseks_20261002/hf_cache/`) kustutatud 11.10 pärast v4
+treeningut ja evali. Vana v2: `~/_kustutamiseks_20261005/data_kurrent_v2`.
 
 ---
 

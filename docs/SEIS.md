@@ -15,12 +15,12 @@ Viimati uuendatud: **06.10.2026**
 ## 1. Mis praegu tootmises jookseb
 
 > Trükipool `print-base-r64-mi-vl-20261006` alates 06.10 09:56 (koos makronijuhisega,
-> §4), käsikirjapool `kurrent-20261002` alates 04.10.
+> §4), käsikirjapool `kurrent-20261009` (andmestik v4, §3.4e) alates 11.10.
 
 | teenus | port | mudel | alates |
 |---|---|---|---|
 | `llama-server-print` | 8080 | **`print-base-r64-mi-vl-20261006-Q8_0`** | 06.10 |
-| `llama-server-hand` | 8081 | **`kurrent-20261002-Q8_0`** | 04.10 |
+| `llama-server-hand` | 8081 | **`kurrent-20261009-Q8_0`** | 11.10 |
 | `ocr-service` | — | klient mõlemale, `ENGINE_CONFIGS` = llamacpp | — |
 
 GPU 24,3 / 32,6 GB. Mõlemal serveril **`--image-max-tokens 5000`**, klient teeb
@@ -459,7 +459,25 @@ taastamine järgmises iteratsioonis.
    juhis ja mudel lähevad tootmisse KOOS (§3.3); varem muutes saaks vana mudel uue juhise.
    NB: trüki-`INSTRUCTION` ütleb veel „ũ, ñ, õ – keep as is (tilde preserved)" — see muutub
    trükimudeli järgmise treeninguga (VUTT #533 samm 4), mitte nüüd.
-   `~/_kustutamiseks_20261002/hf_cache/` kustutada alles pärast treeningut.
+   `~/_kustutamiseks_20261002/hf_cache/` kustutatud 11.10 pärast evali.
+
+### 3.4e Treening v4 (09.–11.10.2026) — tootmises 11.10
+
+Treening 09.10 13:21 → 11.10 07:05, 4 680 sammu, 18 716 näidet, holdout 130, retsept §3.5
+(bf16, responses-only, makron + ſ→s juhis). train_loss 0,261 (v2 0,296; koostis erineb, ei ole
+otse võrreldav). Eval `scripts/kurrent_v4_eval.sh` (v2 skripti koopia), logi
+`logs/kurrent-v4-eval-20261011-0926.log`, väljundid `data/kurrent/eval/kurrent-20261009-Q8_0`.
+
+Q8_0, 127 lk (3 pildileket väljas), loopideta: mediaan 3,1 → **2,4 %**, keskmine 5,7 → 4,3 %;
+leht-lehelt parem 29 / halvem 13 / ±1 pp 82. Oesel lk 3: CER norm 1,6 → 1,5 %, WER 8,4 → 8,0 %,
+„Eresparre" 3× → 0× (Ekesparre õige). Suurimad võidud: dresdner_1665 20,4 → 1,6 (v2 kordas vana
+katkise TEI-ehitaja laiendusi), dta_geusau 3,2 → 1,6, dta_kosmos 2,1 → 1,2, krigshovratt 7,2 → 4,1.
+Regress ≤ 0,3 pp (xix_read 1750–1900, hanse17; n 8–10) — müra piires.
+Loope tabelis 1 → 3, päris loop ainult üks: hanse17 `25791` (lõik 20×, ratio 4,5). 13220 ja 15116
+on osalise GT lävendiartefakt (v2 samadel 1,39 / 1,48).
+NB: `vordle_kurrent.py` rühmasildid („vanad 70", „uued 60") on v2 holdouti järgi — v4 holdoutiga
+loe rida „kõik". 04.10 eval-kaust jooksis enne makroni/ſ→s juhist, seega „vana vs vana" rida
+mõõdab juhise mõju, mitte determinismi.
 
 ### 3.5 Retsept, kui vaja korrata
 
@@ -593,8 +611,7 @@ ei tohi mälu järgi tsiteerida.
     allikate kaupa näidised üle, siis kandidaadid v4-st välja.
 
 12. **Masina koristus pärast Kurrendi v4 treeningut** (09.10 kokku lepitud):
-    (a) `~/_kustutamiseks_20261002/hf_cache/` (85 GB, toor-XML) — alles PÄRAST
-    treeningut; (b) vahemälud `~/.cache/pip` 25 GB, `~/.cache/uv` 16 GB,
+    (a) ~~`~/_kustutamiseks_20261002/hf_cache/` (85 GB, toor-XML)~~ kustutatud 11.10; (b) vahemälud `~/.cache/pip` 25 GB, `~/.cache/uv` 16 GB,
     `~/.cache/huggingface` muu kui `models--unsloth--Qwen3.5-9B` (baasmudel,
     JÄÄB); (c) kasutaja otsustab: `qwen-treening`, `~/kraken-test`, `~/.pyenv`,
     väikesed `ERR-rel`, `pagexml-to-alto`, `jaanson`, `trocr`, `AUTO-OCR`,
