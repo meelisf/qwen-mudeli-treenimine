@@ -35,6 +35,20 @@ teenus siia peale lülitada, muidu jooksevad kaks koopiat lahku.
 LOOP_MAX_PERIOD = 30
 LOOP_MIN_REPS = 3
 
+#: Muster ILMA ühegi täheta/numbrita (`. . .`, `* * *`, `— — —`) on trükis
+#: tavaline: ärajätt, lõiguvahe, mõttekriipsurida. 3 kordusega lükati
+#: 11.10.2026 Rieger'i Briefbuchi lk 100 tagasi (`… ward! . . . Seit` →
+#: periood 1, 3 kordust), kuigi väljund oli täielik (`finish_reason: stop`).
+#: Päris loop jookseb tokenilaeni ja ületab need läved sadu kordi; trükitud
+#: märgirida ei ulatu kunagi 20 sõna ega 200 märgini.
+PUNCT_MIN_REPS = 20       # sõnatasand
+PUNCT_MIN_CHARS = 200     # märgitasand: kordus peab katma vähemalt nii palju
+
+
+def _sisuta(osad):
+    """Kas mustris ei ole ühtki tähte ega numbrit?"""
+    return not any(c.isalnum() for osa in osad for c in osa)
+
 
 def find_tail_loop(sonad, max_period=LOOP_MAX_PERIOD, min_reps=LOOP_MIN_REPS):
     """Kas sõnajärjendi LÕPP on korduv tsükkel? Tagastab (periood, kordused) või None.
@@ -52,7 +66,7 @@ def find_tail_loop(sonad, max_period=LOOP_MAX_PERIOD, min_reps=LOOP_MIN_REPS):
         while i >= 0 and sonad[i:i + period] == muster:
             reps += 1
             i -= period
-        if reps >= min_reps:
+        if reps >= (max(min_reps, PUNCT_MIN_REPS) if _sisuta(muster) else min_reps):
             return period, reps
     return None
 
@@ -81,7 +95,7 @@ def find_char_loop(text, tail=CHAR_TAIL, max_period=CHAR_MAX_PERIOD,
         while i >= 0 and s[i:i + period] == muster:
             reps += 1
             i -= period
-        if reps >= min_reps:
+        if reps >= min_reps and (not _sisuta(muster) or reps * period >= PUNCT_MIN_CHARS):
             return period, reps
     return None
 
