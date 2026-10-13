@@ -9,6 +9,7 @@ kettale, nii et hiljem saab neid ka silmaga kõrvuti vaadata.
   python scripts/eval_kurrent.py                              # vana mudel
   python scripts/eval_kurrent.py models/qwen3.5-ocr-kurrent-20260828
   python scripts/eval_kurrent.py --prompt print               # INSTRUCTION, mitte KURRENT_INSTRUCTION
+  python scripts/eval_kurrent.py --prompt kurrent_v5 models/… # v5 mudel (<add>-juhis)
   python scripts/eval_kurrent.py --limit 10                   # kiire proov
   python scripts/eval_kurrent.py --resume                     # jätka pooleli jäänut
   python scripts/eval_kurrent.py --name kordus-2026xxxx        # muu väljundikaust
@@ -80,7 +81,7 @@ from PIL import Image as PILImage
 
 sys.path.insert(0, str(Path(__file__).parent))
 from imaging import MAX_PIXELS, fit_to_grid
-from prompt import INSTRUCTION, KURRENT_INSTRUCTION
+from prompt import INSTRUCTION, KURRENT_INSTRUCTION, KURRENT_INSTRUCTION_V5
 from lyhend_makron import makroniks
 
 csv.field_size_limit(10 ** 7)
@@ -148,14 +149,17 @@ if RESAMPLE not in ("lanczos", "bicubic"):
     sys.exit(1)
 RESAMPLE_FILTER = PILImage.LANCZOS if RESAMPLE == "lanczos" else PILImage.BICUBIC
 
-if PROMPT_KIND not in ("kurrent", "print"):
-    print("Viga: --prompt peab olema 'kurrent' või 'print'")
+if PROMPT_KIND not in ("kurrent", "kurrent_v5", "print"):
+    print("Viga: --prompt peab olema 'kurrent', 'kurrent_v5' või 'print'")
     sys.exit(1)
 
 # Teenus (kataloogi-jalgimine-ja-ocr.py) saadab käsikirjamudelile praegu
 # INSTRUCTION-i, kuigi treenitud on KURRENT_INSTRUCTION-iga. --prompt print
 # on selleks, et selle vahe saaks lõpuks ära mõõta.
-PROMPT = KURRENT_INSTRUCTION if PROMPT_KIND == "kurrent" else INSTRUCTION
+# kurrent_v5 = v5 andmestikuga treenitud mudel (<add> lisamiskohas); vana mudelit
+# hinda tema enda juhisega (kurrent), muidu ei ole võrdlus aus.
+PROMPT = {"kurrent": KURRENT_INSTRUCTION, "kurrent_v5": KURRENT_INSTRUCTION_V5,
+          "print": INSTRUCTION}[PROMPT_KIND]
 
 if not HOLDOUT_PATH.exists():
     print(f"Viga: holdout puudub: {HOLDOUT_PATH}")

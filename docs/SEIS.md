@@ -479,6 +479,51 @@ NB: `vordle_kurrent.py` rühmasildid („vanad 70", „uued 60") on v2 holdouti 
 loe rida „kõik". 04.10 eval-kaust jooksis enne makroni/ſ→s juhist, seega „vana vs vana" rida
 mõõdab juhise mõju, mitte determinismi.
 
+### 3.4f Andmestik v5 (12.10.2026) — EHITATUD, treening ootab (nädalavahetus)
+
+`data/kurrent_v5` (`scripts/build_kurrent_v5.py`, kuivkäivitus `--dry-run`, uuesti `--uuesti`):
+**19 355 rida, holdout 145** (v4 130 + Leibniz val 10 + Klinger 5). Alus `data/kurrent` (v4 pärast
+GT-kontrolli väljavõttu). Pildid hardlink-itud. Commitimata (ka `build_dta_kosmos.py --add`).
+
+| | lehti | märkus |
+|---|---|---|
+| Leibniz clean | 248 | eScriptorium; `DigitizationArtefactZone`/`GraphicZone` välja, `MarginTextZone` sees |
+| Leibniz val | 27 | 10 holdout (ladina, eri dokumentidest, seed 3407) + 17 treeningusse |
+| Gwalther | 142 | CC BY-NC 4.0 |
+| Klinger (VUTT #576) | 92 | `data/rieger/klapitus/klinger_gt_vutt` (`ehita_gt_vutt.py`); holdout 5 = üks leht kirja kohta (CXXXI, CXXXVIII, CLII, CXC, CXCVIII) |
+| DTA Kosmos/Geusau/Sanders | 3 555 | tekst asendatud `data/dta_{kosmos,lisa}_v5`-ga (vt allpool) |
+
+**Interlineaarne lisandus = `<add>…</add>` lisamiskohas** (VUTT ADR 0067, PR #578). GT-s 1 144 `<add>`
+(DTA 1 089, Klinger 55). `build_dta_kosmos.py --add`: `place` superlinear/sublinear/left/right →
+`<add>` (mitmerealine lisandus märgendita); `across` (DTA-s ülekirjutus `<subst><del #ow>…<add across>`)
+ja intralinear märgendita; **`<subst>`-is kustutatud osa alati välja**, ka `del #s` — v4-s olid
+kustutatud ja uus sõna kokku liimitud („oderund", „ThierPilz", „nichtnirgend"; 675 lehte muutus
+peale `<add>`-i); **pliiatsikäe** (`hand="#…pencil…"`, enamasti „unbekannter Schreiber"/arhivaar)
+add/note/fw välja, pliiatsi del/hi jätavad tindis teksti. Leibnizi `InterlinearLine` (329, mediaan
+1 sõna) jääb omaette reaks — sõnakoordinaate ei ole, lisamiskohta ei saa (ADR 0067: PAGE XML jääb).
+Klingeri `<m>` → tavatekst, rea lõpu ⸗ → ¬ (Kurrendi juhis; VUTT-is jääb ⸗).
+Mudeli eval peab mõõtma `<add>`-i: CER sama etaloni vastu, lisamiskoha õigsus eraldi (ADR 0067).
+
+**ENNE TREENINGUT (avatud):**
+1. **Juhis.** `KURRENT_INSTRUCTION` p 7 „Do not add any XML tags" on `<add>`-iga vastuolus. Teenus
+   (`kataloogi-jalgimine-ja-ocr.py`) impordib SAMA konstandi → selle muutmine viiks uue juhise v4
+   mudeliga tootmisse järgmise restardiga. Ettepanek: `prompt.py`-sse `KURRENT_INSTRUCTION_V5`
+   (p 7: „Insertions written above or below the line, or in the margin with a mark showing where they
+   belong: transcribe them at that point as <add>text</add> … No other XML tags"), `train_kurrent.py`
+   + `eval_kurrent.py` kasutavad seda; teenus lülitub `_V5`-le alles uue mudeli tootmisse viimisel.
+   **TEHTUD 13.10 (kasutaja otsus):** `KURRENT_INSTRUCTION_V5` prompt.py-s, train_kurrent.py kasutab seda,
+   eval_kurrent.py `--prompt kurrent_v5`. Teenus jääb vana juhise peale — v5 mudeli tootmisse viimisel
+   lülitada teenus (`kataloogi-jalgimine-ja-ocr.py` "hand") JA VUTT-i `server/ocr_prompts.py` hand-juhis koos.
+   Treening jookseb TÜ HPC Rocketis (H200), mitte LOSSis.
+2. **Vahetus** `data/kurrent` → varukoopia, `data/kurrent_v5` → `data/kurrent` (gt_kontroll/eval/oesel
+   kaasa, nagu v4 vahetusel). `train_kurrent.py` loeb fikseeritud teed. Siis `--test --16bit`.
+3. **MAX_SEQ**: 43 lehte > 6 000 tähe (Leibniz clean 34, val 2, xix 6, trolldom 1) — `--test` näitab, mitu
+   ületab 8 192 tokenit ja jääb välja.
+4. **Tootmisse viimine** eeldab VUTT-i redaktoris `<add>`-i tuge (ADR 0067 lahtine: välimus) — praegu
+   näitab redaktor täge toorena.
+5. VUTT-i Klingeri lehed on osaliselt AJUTISELT „Valmis" (76 lk, VUTT /data `git log --grep "ajutiselt Valmis"`)
+   → hiljem tagasi „Parandatud"-ks; GT ehitada uuesti, kui lehti parandatakse.
+
 ### 3.5 Retsept, kui vaja korrata
 
 `PYTHONUNBUFFERED=1 venv/bin/python scripts/train_kurrent.py --16bit` (alates 02.10; ilma PYTHONUNBUFFERED-ita jääb `| tee` logis loss puhvrisse; 29.08 jooks oli
@@ -619,7 +664,8 @@ ei tohi mälu järgi tsiteerida.
     Tehtud 09.10: `disp`, `tartu-acad`, `vanad - VUTT…`, `HTRflow-riksarkivet`,
     `EstLLM-finetune` kustutatud (279 GB); CUDA koristus §1.2.
 
-13. **Kurrendi v5 andmestik — mis ootab sisselülitamist** (kirja pandud 10.10,
+13. **Kurrendi v5 andmestik** — **EHITATUD 12.10, vt §3.4f** (allikad a–d sees; Klinger =
+    `klinger_gt_vutt`, mitte allolev automaatklapitus). Algne kirje (10.10,
     v4 treeningu ajal). Järgmine Kurrendi ehitus = v4 + järgmised allikad:
     (a) **Leibniz clean** 248 lk, `DenisaBumba/htr_leibniz_dataset_v1`, CC BY 4.0;
     (b) **Gwalther** 142 lk, Zenodo 4780947, CC BY-NC 4.0;
@@ -633,6 +679,12 @@ ei tohi mälu järgi tsiteerida.
     Ehitusskript on kirjutamata. Enne treeningut veel: VUTT-i oma ladina eval
     (Fischeri kirjad, 15–20 lk käsitsi parandatud); Klingeri käsi (VUTT #576,
     Riegeri klapitus + Valmis-aadresslehed) — kui valmis, samasse ehitusse.
+    (d) **Klingeri klapitus** (11.10): `data/rieger/klapitus/klinger_gt/` — 21 lk / 385 rida,
+        `allikas=klinger_rieger`, `holdout.txt` 5 lk kirja kaupa (Klingeri eval; GT automaatne →
+        enne evali käsitsi üle vaadata). Allikad: köide t9zd42 (ADA 10062/7822, 65 kirja) + 671arc +
+        05nctg; 1816. a üksikkirjade teosed on SAMA skaneering mis t9zd42 → dedubleeritud.
+        Värav τ=0,6 + vahe ≤5 + ilma Riegeri kuupäevareata (ka kirja lõpus) + ilma toimetaja
+        nurksulgudeta + ≥6 rida (aadresslehed välja). Servaread välja — kasutaja otsus „vaatame hiljem".
 
 Punktid 5, 7, 9, 10 pärinevad
 `docs/arhiiv/treening-ja-inferentsi-koodi-ulevaade-20260828.md`-st.

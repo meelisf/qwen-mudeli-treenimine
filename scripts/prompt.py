@@ -94,3 +94,16 @@ page and then stop. Never pad a sparse page with invented text, and never contin
 text from another page in order to fill it.
 
 Return only the transcription."""
+
+
+# v5 juhis (andmestik v5, 12.10.2026): GT kannab interlineaarset lisandust
+# `<add>…</add>` lisamiskohas (VUTT ADR 0067). Erineb ainult punkti 7 poolest.
+# Kasutavad AINULT train_kurrent.py ja eval_kurrent.py --prompt kurrent_v5;
+# teenus (kataloogi-jalgimine-ja-ocr.py) jääb KURRENT_INSTRUCTION-i peale, kuni
+# v5 mudel tootmisse läheb — siis lülitada teenus ja VUTT-i juhis koos ümber.
+_P7_VANA = "7. Do not add any XML tags, markdown, or formatting — plain text only."
+_P7_V5 = ("7. Insertions written above or below the line, or in the margin with a mark showing where\n"
+          "   they belong: transcribe them at that point as <add>text</add>.\n"
+          "   No other XML tags, markdown, or formatting — plain text otherwise.")
+assert KURRENT_INSTRUCTION.count(_P7_VANA) == 1
+KURRENT_INSTRUCTION_V5 = KURRENT_INSTRUCTION.replace(_P7_VANA, _P7_V5)

@@ -30,6 +30,13 @@ Käivitamine:
   python scripts/train_kurrent.py --resume    # jätka viimasest checkpointist
   python scripts/train_kurrent.py --16bit     # baas bf16-na, mitte 4-bitisena (QLoRA)
 
+Suurema VRAM-iga GPU (A100 80 GB, H200; vaikeväärtused = 5090 retsept):
+  --batch=N       per_device_train_batch_size (vaikimisi 1)
+  --grad-acc=N    gradient_accumulation_steps (vaikimisi 8, --test 4);
+                  efektiivne batch = batch x grad-acc, hoia 8, et jääda võrreldavaks
+  --no-gc         gradient checkpointing välja (kiirem, vajab rohkem mälu)
+  --workers=N     dataloader_num_workers (vaikimisi 0); pildi laadimine tööprotsessides
+
 Muudatused 2026-10-02 (andmestik v2):
   - kadu ainult vastusel (train_on_responses_only); juhis oli 47 % kaotokenitest
   - näited, mis ei mahu MAX_SEQ sisse, jäetakse välja (koenigsfelden 2 lk)
@@ -52,7 +59,7 @@ from trl import SFTTrainer, SFTConfig
 from transformers import TrainerCallback
 from unsloth.trainer import UnslothVisionDataCollator
 from PIL import Image as PILImage
-from prompt import KURRENT_INSTRUCTION
+from prompt import KURRENT_INSTRUCTION_V5   # v5: <add> lisamiskohas (prompt.py)
 
 TEST_MODE = "--test" in sys.argv
 if TEST_MODE:
@@ -70,6 +77,10 @@ MAX_SEQ = 8192
 MAX_PIXELS = 5_120_000
 SAVE_STEPS = 250   # ~1,9 h (27,9 s/samm); checkpoint 1,2 GB, alles hoitakse 3
 RESUME_FROM = None # --resume (viimane) või --resume=<tee checkpointini>
+BATCH = 1                           # --batch=N
+GRAD_ACC = 4 if TEST_MODE else 8    # --grad-acc=N
+NO_GC = "--no-gc" in sys.argv       # gradient checkpointing välja
+WORKERS = 0                         # --workers=N
 
 for i, arg in enumerate(sys.argv):
     if arg.startswith("--base="):
@@ -84,10 +95,18 @@ for i, arg in enumerate(sys.argv):
         RESUME_FROM = arg.split("=", 1)[1]
     elif arg == "--resume":
         RESUME_FROM = "auto"
+    elif arg.startswith("--batch="):
+        BATCH = int(arg.split("=", 1)[1])
+    elif arg.startswith("--grad-acc="):
+        GRAD_ACC = int(arg.split("=", 1)[1])
+    elif arg.startswith("--workers="):
+        WORKERS = int(arg.split("=", 1)[1])
 
 # Kas baasmudel on lokaalne checkpoint (LoRA juba küljes) või HF mudel?
 FROM_CHECKPOINT = Path(BASE_MODEL).exists()
 print(f"LoRA rank: {LORA_RANK}")
+print(f"Batch: {BATCH} x grad_acc {GRAD_ACC} = {BATCH * GRAD_ACC}, "
+      f"gradient checkpointing: {'VÄLJAS' if NO_GC else 'unsloth'}, workers: {WORKERS}")
 if not FROM_CHECKPOINT:
     print(f"HF baasmudel – get_peft_model() kutsutakse (rank={LORA_RANK})")
 
@@ -157,7 +176,7 @@ if not torch.cuda.is_available():
 model, tokenizer = FastVisionModel.from_pretrained(
     model_name=BASE_MODEL,
     load_in_4bit=LOAD_4BIT,
-    use_gradient_checkpointing="unsloth",
+    use_gradient_checkpointing=False if NO_GC else "unsloth",
 )
 
 tokenizer.truncation = False
@@ -208,7 +227,7 @@ def _load_holdout(path):
     return holdout
 
 
-_JUHIS_TOKENEID = len(tokenizer.tokenizer(KURRENT_INSTRUCTION)["input_ids"])
+_JUHIS_TOKENEID = len(tokenizer.tokenizer(KURRENT_INSTRUCTION_V5)["input_ids"])
 _MALLI_VARU = 32  # chat template'i tokenid + tühi <think>-plokk
 
 
@@ -270,11 +289,12 @@ class KurrentAndmestik:
         if liiga_pikk:
             print(f"  Üle {MAX_SEQ} tokeni: {liiga_pikk} näidet välja jäetud")
         if TEST_MODE:
-            # Pikimad ette: 5 sammu x grad_acc 4 = 20 näidet halvimast otsast,
+            # Pikimad ette: 5 sammu x batch x grad_acc näidet halvimast otsast,
             # et tipumälu ja sammu aeg oleksid halvima juhu omad.
+            n = 5 * BATCH * GRAD_ACC
             self.samples.sort(key=lambda s: -s["pikkus"])
-            self.samples = self.samples[:20]
-            print(f"  TEST: 20 pikimat näidet, {self.samples[-1]['pikkus']}–{self.samples[0]['pikkus']} tokenit")
+            self.samples = self.samples[:n]
+            print(f"  TEST: {n} pikimat näidet, {self.samples[-1]['pikkus']}–{self.samples[0]['pikkus']} tokenit")
         print(f"  Andmestik: {len(self.samples)} näidet")
 
     def __len__(self):
@@ -287,7 +307,7 @@ class KurrentAndmestik:
                 {
                     "role": "user",
                     "content": [
-                        {"type": "text",  "text":  KURRENT_INSTRUCTION},
+                        {"type": "text",  "text":  KURRENT_INSTRUCTION_V5},
                         {"type": "image", "image": s["img"]},
                     ],
                 },
@@ -328,8 +348,8 @@ trainer = SFTTrainer(
     ),
     args=SFTConfig(
         max_length=MAX_SEQ,
-        per_device_train_batch_size=1,
-        gradient_accumulation_steps=4 if TEST_MODE else 8,
+        per_device_train_batch_size=BATCH,
+        gradient_accumulation_steps=GRAD_ACC,
         warmup_steps=2 if TEST_MODE else 80,
         max_steps=5 if TEST_MODE else CUSTOM_STEPS,
         num_train_epochs=2,
@@ -344,7 +364,7 @@ trainer = SFTTrainer(
         remove_unused_columns=False,
         dataset_text_field="",
         dataset_kwargs={"skip_prepare_dataset": True},
-        dataloader_num_workers=0,
+        dataloader_num_workers=WORKERS,
         save_strategy="no" if TEST_MODE else "steps",
         save_steps=SAVE_STEPS,
         save_total_limit=3,
@@ -414,7 +434,7 @@ for test_image_path in test_images:
     print(f"\nTestpilt: {test_image_path.name}")
 
     messages = [{"role": "user", "content": [
-        {"type": "text",  "text":  KURRENT_INSTRUCTION},
+        {"type": "text",  "text":  KURRENT_INSTRUCTION_V5},
         {"type": "image"},
     ]}]
     input_text = tokenizer.apply_chat_template(
