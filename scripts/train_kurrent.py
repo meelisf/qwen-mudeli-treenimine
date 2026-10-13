@@ -81,9 +81,9 @@ BATCH = 1                           # --batch=N
 GRAD_ACC = 4 if TEST_MODE else 8    # --grad-acc=N
 NO_GC = "--no-gc" in sys.argv       # gradient checkpointing välja
 WORKERS = 0                         # --workers=N
-# Andmestik ja juhis käivad koos: KURRENT_INSTRUCTION_V5 (<add>) eeldab v5 GT-d.
-# Vana data/kurrent (v4) ei sisalda <add>-i — selle jaoks anna --data-dir selgesõnaliselt.
-DATA_DIR = "data/kurrent_v5"        # --data-dir=<kaust>
+# Andmestik ja juhis käivad koos: KURRENT_INSTRUCTION_V5 (<add>, <m>) eeldab v5m GT-d.
+# Vana data/kurrent (v4) ei sisalda märgendeid — selle jaoks anna --data-dir selgesõnaliselt.
+DATA_DIR = "data/kurrent_v5m"       # --data-dir=<kaust>
 
 for i, arg in enumerate(sys.argv):
     if arg.startswith("--base="):

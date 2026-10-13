@@ -19,7 +19,12 @@
   Lühendusmärk → makron ja ſ → s kõigis UUTES ridades (nagu v4); Klingeri rea
   lõpu ⸗/= → ¬ (Kurrendi juhis; VUTT-is jääb ⸗).
 Pildid hardlink-itud. Sisendkaustu ei muudeta.
-Käivitus: venv/bin/python scripts/build_kurrent_v5.py [--dry-run] [--uuesti]
+--marg (2026-10-13) → data/kurrent_v5m: veeris <m>…</m>-ina (iga füüsiline rida omaette,
+  VUTT ADR 0009; trükijuhise p 10 „omal kohal põhiridade vahel"). Leibnizi MarginTextZone
+  read lähevad kõrguse järgi selle põhitsooni ridade vahele, millega tsoonil on suurim
+  vertikaalne kattuvus (topeltlehel õigele lehele); DTA tuleb *_v5m-ist
+  (build_dta_kosmos.py --add --marg); Klingeri <m> jääb alles.
+Käivitus: venv/bin/python scripts/build_kurrent_v5.py [--dry-run] [--uuesti] [--marg]
 """
 import csv, os, random, re, shutil, sys
 from collections import Counter
@@ -31,9 +36,11 @@ sys.path.insert(0, str(Path(__file__).parent))
 from lyhend_makron import makroniks                                   # noqa: E402
 
 DRY = "--dry-run" in sys.argv
+MARG = "--marg" in sys.argv
 BASE = Path("data/kurrent")
-NEW = Path("data/kurrent_v5")
-DTA_V5 = [Path("data/dta_kosmos_v5"), Path("data/dta_lisa_v5")]
+NEW = Path("data/kurrent_v5m" if MARG else "data/kurrent_v5")
+DTA_V5 = [Path(f"data/dta_kosmos_v5{'m' if MARG else ''}"), Path(f"data/dta_lisa_v5{'m' if MARG else ''}")]
+MARG_ZONE = "MarginTextZone"
 DTA_ALLIKAD = {"dta_kosmos_1827", "dta_geusau_1740", "dta_sanders_1860"}
 RAW = Path("data/raw_xml")
 GW = RAW / "gwalther/bullinger-digital-gwalther-handwriting-ground-truth-ef9f482"
@@ -69,16 +76,64 @@ def page_tekst(xml):
     if ro:
         jrk = {rid: i for i, rid in enumerate(ro)}
         regs.sort(key=lambda r: jrk.get(r.get("id"), len(jrk)))
-    read = []
+    regs = [r for r in regs if tyyp(r) not in REGION_VALJA]
+
+    def rida(tl):
+        te = tl.find(f"{ns}TextEquiv")            # rea enda TextEquiv, mitte Word'ide oma
+        uc = te.find(f"{ns}Unicode") if te is not None else None
+        t = (uc.text or "").strip() if uc is not None else ""
+        return re.sub(r"\s+", " ", t)
+
+    if not MARG:
+        read = [t for r in regs for t in map(rida, r.findall(f"{ns}TextLine")) if t]
+        return "\n".join(read) or None
+
+    def punktid(el):
+        for nimi in ("Baseline", "Coords"):
+            x = el.find(f"{ns}{nimi}")
+            if x is not None and x.get("points"):
+                return [tuple(map(float, p.split(",")[:2])) for p in x.get("points").split()]
+        return []
+
+    def y_kesk(tl):
+        p = punktid(tl)
+        return sum(y for _, y in p) / len(p) if p else 0.0
+
+    def ulatus(r):
+        p = punktid(r) or [q for tl in r.findall(f"{ns}TextLine") for q in punktid(tl)]
+        if not p:
+            return 0.0, 0.0, 0.0
+        ys = [y for _, y in p]
+        return min(ys), max(ys), sum(x for x, _ in p) / len(p)
+
+    # Põhitsoonide read (y-ga); veerise tsoonid seotakse põhitsooniga ja read lähevad
+    # kõrguse järgi tema ridade vahele. Peremeheks ainult sisulised tsoonid
+    # (NumberingZone jms ainult siis, kui muud pole).
+    sisu = {}
     for r in regs:
-        if tyyp(r) in REGION_VALJA:
+        if tyyp(r) != MARG_ZONE:
+            sisu[id(r)] = [(y_kesk(tl), t) for tl in r.findall(f"{ns}TextLine") if (t := rida(tl))]
+    peremehed = [r for r in regs if tyyp(r) not in (MARG_ZONE, "NumberingZone") and sisu.get(id(r))] \
+        or [r for r in regs if tyyp(r) != MARG_ZONE and sisu.get(id(r))]
+    orvud = []
+    for m in (r for r in regs if tyyp(r) == MARG_ZONE):
+        mread = sorted((y_kesk(tl), f"<m>{t}</m>") for tl in m.findall(f"{ns}TextLine") if (t := rida(tl)))
+        if not mread:
             continue
-        for tl in r.findall(f"{ns}TextLine"):
-            te = tl.find(f"{ns}TextEquiv")        # rea enda TextEquiv, mitte Word'ide oma
-            uc = te.find(f"{ns}Unicode") if te is not None else None
-            t = (uc.text or "").strip() if uc is not None else ""
-            if t:
-                read.append(re.sub(r"\s+", " ", t))
+        if not peremehed:
+            orvud += [t for _, t in mread]
+            continue
+        my0, my1, mx = ulatus(m)
+
+        def sobivus(r):
+            y0, y1, x = ulatus(r)
+            return (max(0.0, min(my1, y1) - max(my0, y0)), -abs(mx - x))
+        host = max(peremehed, key=sobivus)
+        for y, t in mread:                       # enne esimest põhirida, mis on temast allpool
+            rr = sisu[id(host)]
+            i = next((k for k, (yy, _) in enumerate(rr) if yy > y), len(rr))
+            rr.insert(i, (y, t))
+    read = orvud + [t for r in regs if tyyp(r) != MARG_ZONE for _, t in sisu[id(r)]]
     return "\n".join(read) or None
 
 
@@ -163,7 +218,8 @@ def main():
         t = t.replace("ſ", "s")
         if a == "klinger_vutt":   # VUTT-i ⸗/= → Kurrendi juhise ¬ (KURRENT_INSTRUCTION p 3)
             t = re.sub(r"[⸗=]$", "¬", t, flags=re.M)
-            t = re.sub(r"</?m>", "", t)   # veeris tavatekstiks (kasutaja 12.10: <m> juhisesse ei lähe)
+            if not MARG:
+                t = re.sub(r"</?m>", "", t)   # veeris tavatekstiks (kasutaja 12.10: <m> juhisesse ei lähe)
         out.append([f, t, a]); src[f] = Path(pilt)
         proj[f] = a if xml is None else f"{a}:{xml.stem}"
         st[f"+{a}"] += 1
@@ -173,6 +229,12 @@ def main():
     for k, v in sorted(st.items()):
         print(f"  {k}: {v}")
     print(f"<add> DTA-s {add_n}, Klingeris {sum(r[1].count('<add>') for r in out if r[2] == 'klinger_vutt')}")
+    if MARG:
+        mc = Counter()
+        for r in out:
+            if "<m>" in r[1]:
+                mc[r[2]] += 1
+        print(f"<m>-iga lehti {sum(mc.values())}, <m>-ridu {sum(r[1].count('<m>') for r in out)}: {dict(mc)}")
     print(f"holdout −{len(ho_valja)} +{len(ho_uued)}: {Counter(a for a, _ in ho_uued)}")
     print(f"leibniz val holdout: {[os.path.basename(f) for _, f in ho_uued if 'leibniz' in f]}")
     print(f"> {PIKK} tähe (MAX_SEQ oht): {dict(pikad)}")

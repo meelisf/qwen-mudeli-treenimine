@@ -504,6 +504,14 @@ add/note/fw välja, pliiatsi del/hi jätavad tindis teksti. Leibnizi `Interlinea
 Klingeri `<m>` → tavatekst, rea lõpu ⸗ → ¬ (Kurrendi juhis; VUTT-is jääb ⸗).
 Mudeli eval peab mõõtma `<add>`-i: CER sama etaloni vastu, lisamiskoha õigsus eraldi (ADR 0067).
 
+**v5m (13.10, kasutaja otsus): veeris `<m>`-ina.** `build_dta_kosmos.py --add --marg` → `data/dta_{kosmos,lisa}_v5m`
+(note place left/right/margin → iga rida omaette `<m>` ankurrea ette; v5-s lõikas märkus põhirea kaheks ja jäi
+märgendita), `build_kurrent_v5.py --marg` → **`data/kurrent_v5m`**: Leibnizi MarginTextZone read kõrguse järgi
+peremeestsooni ridade vahele, Klingeri `<m>` alles. **437 lehte / 2 825 `<m>`-rida** (DTA 304, Leibniz 131, Klinger 2);
+muud read v5-ga identsed; holdout sama (145, neist `<m>`-iga 8). `KURRENT_INSTRUCTION_V5` p 7 + `<m>` reegel
+(trükijuhise p 10 sõnastus); `train_kurrent.py --data-dir` vaikimisi `data/kurrent_v5m`. Pikkuse audit: välja 13, kärbitakse 0.
+Põhjus: senatiprotokollides jms on professorid ja otsused veerisel — ilma `<m>`-ita sulas see põhiteksti.
+
 **ENNE TREENINGUT (avatud):**
 1. **Juhis.** `KURRENT_INSTRUCTION` p 7 „Do not add any XML tags" on `<add>`-iga vastuolus. Teenus
    (`kataloogi-jalgimine-ja-ocr.py`) impordib SAMA konstandi → selle muutmine viiks uue juhise v4

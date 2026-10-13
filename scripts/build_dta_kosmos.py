@@ -20,6 +20,11 @@ TEI → diplomaatiline tekst:
   Pliiatsikäsi (hand="#…pencil…": enamasti „unbekannter Schreiber", archivar) —
   add/note/fw välja (VUTT: hilisema käe pliiats ei ole transkriptsioon); pliiatsi
   del/hi jätavad tindis teksti alles. Kustutatud lisandus (del lisanduse sees) välja.
+--marg (v5, 2026-10-13; nõuab --add): veerise märkus (note place left/right/margin) →
+  iga füüsiline rida omaette <m>…</m> reana ANKURREA ETTE (VUTT ADR 0009, trükijuhise
+  p 10: marginaal omal kohal põhiridade vahel). Ilma selleta lõikas märkus põhirea
+  ankru kohalt kaheks reaks ja jäi märgendita. foot/mTop/mBottom jäävad nagu enne.
+  Väljund kaustas *_v5m.
 Leht jääb VÄLJA, kui seal on gap (loetamatu/kadunud), tabel, U+FFFC (esitamatu
 lühendusmärk) või vähem kui MIN_LINES rida.
 
@@ -41,6 +46,10 @@ from pathlib import Path
 DRY = "--dry-run" in sys.argv
 ADD = "--add" in sys.argv
 ADD_PLACE = {"superlinear", "sublinear", "left", "right"}
+MARG = "--marg" in sys.argv
+MARG_PLACE = {"left", "right", "margin"}
+if MARG and not ADD:
+    sys.exit("--marg nõuab --add (v5 ehitus)")
 PLIIATS_VALJA = {"add", "note", "fw"}
 
 
@@ -69,7 +78,7 @@ GRUPID = {
 GRUPP = sys.argv[sys.argv.index("--grupp") + 1] if "--grupp" in sys.argv else "kosmos"
 OUT, KIRJELDUS, TEOSED = GRUPID[GRUPP]
 if ADD:
-    OUT = OUT.with_name(OUT.name + "_v5")
+    OUT = OUT.with_name(OUT.name + ("_v5m" if MARG else "_v5"))
 NS = "{http://www.tei-c.org/ns/1.0}"
 EI_SISU = {"expan", "reg", "corr", "supplied", "metamark", "figDesc", "graphic", "teiHeader"}
 
@@ -128,6 +137,20 @@ class Lehed:
             self.emit("<add>")
             self._sisu(el, jata=("del",))
             self.emit("</add>")
+        elif MARG and t == "note" and el.get("type") != "editorial" \
+                and set(el.get("place", "").split()) & MARG_PLACE:
+            # Märkus ankru kohale markeriks \x01…\x01 (read \x02-ga); lehe_tekst tõstab
+            # need <m>-ridadena ankurrea ette, põhirida jääb terveks.
+            sub = Lehed()
+            sub.cur = 0
+            sub.lehed[0] = []
+            sub._sisu(el)
+            if sub.halvad:
+                self.halb(sub.halvad[0])
+            s = "".join("\x00" if x == "\n" else x.replace("\n", " ") for x in sub.lehed[0])
+            read = [r for r in (re.sub(r"\s+", " ", r).strip() for r in s.split("\x00")) if r]
+            if read:
+                self.emit("\x01" + "\x02".join(read) + "\x01")
         elif t == "note" and (el.get("type") == "editorial" or not el.get("place")):
             pass
         elif t in ("note", "fw"):
@@ -161,6 +184,13 @@ def lehe_tekst(tykid):
     s = "".join("\x00" if x == "\n" else x.replace("\n", " ") for x in tykid)
     s = s.replace("ſ", "s")
     read = [re.sub(r"\s+", " ", r).strip() for r in s.split("\x00")]
+    if MARG:   # veerise märkus(ed) ankurrea ette, iga rida omaette <m> (ADR 0009)
+        uued = []
+        for r in read:
+            for m in re.findall(r"\x01(.*?)\x01", r):
+                uued += [f"<m>{x}</m>" for x in m.split("\x02")]
+            uued.append(re.sub(r" {2,}", " ", re.sub(r"\x01.*?\x01", "", r)).strip())
+        read = uued
     if ADD:   # tühik tägist väljapoole, mitte sisu servale; tühi lisandus välja
         read = [re.sub(r"<add>\s+", " <add>", r) for r in read]
         read = [re.sub(r"\s+</add>", "</add> ", r) for r in read]
