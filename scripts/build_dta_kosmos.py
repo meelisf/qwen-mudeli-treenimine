@@ -12,6 +12,14 @@ TEI → diplomaatiline tekst:
   del #s jääb (läbikriipsutus on pildil loetav); del #ow/#erased välja (ülekirjutatud)
   add, unclear, hi, fw, marginaal-note jäävad; note type=editorial välja; metamark välja
   ſ → s (ülejäänud Kurrendi GT-s ſ-i ei ole); rea lõpu „-" jääb nagu DTA-s
+--add (v5, VUTT ADR 0067): rea kohale/alla või veerisele kirjutatud lisandus
+  (place superlinear/sublinear/left/right) → <add>…</add> oma lisamiskohas; across
+  (ülekirjutus) ja intralinear jäävad märgendita; mitmerealine lisandus (<lb/> sees)
+  jääb märgendita. Asenduses (<subst>) jääb kustutatud osa ALATI välja, ka del #s —
+  muidu kannaks GT nii vana kui uut sõna. Väljund kaustas *_v5.
+  Pliiatsikäsi (hand="#…pencil…": enamasti „unbekannter Schreiber", archivar) —
+  add/note/fw välja (VUTT: hilisema käe pliiats ei ole transkriptsioon); pliiatsi
+  del/hi jätavad tindis teksti alles. Kustutatud lisandus (del lisanduse sees) välja.
 Leht jääb VÄLJA, kui seal on gap (loetamatu/kadunud), tabel, U+FFFC (esitamatu
 lühendusmärk) või vähem kui MIN_LINES rida.
 
@@ -31,6 +39,13 @@ from datetime import datetime
 from pathlib import Path
 
 DRY = "--dry-run" in sys.argv
+ADD = "--add" in sys.argv
+ADD_PLACE = {"superlinear", "sublinear", "left", "right"}
+PLIIATS_VALJA = {"add", "note", "fw"}
+
+
+def pliiats(el):
+    return "pencil" in el.get("hand", "")
 TEI_DIR = Path("data/dta_tei")
 IMG_CACHE = TEI_DIR / "img"
 MIN_LINES = 5
@@ -53,6 +68,8 @@ GRUPID = {
 }
 GRUPP = sys.argv[sys.argv.index("--grupp") + 1] if "--grupp" in sys.argv else "kosmos"
 OUT, KIRJELDUS, TEOSED = GRUPID[GRUPP]
+if ADD:
+    OUT = OUT.with_name(OUT.name + "_v5")
 NS = "{http://www.tei-c.org/ns/1.0}"
 EI_SISU = {"expan", "reg", "corr", "supplied", "metamark", "figDesc", "graphic", "teiHeader"}
 
@@ -102,6 +119,15 @@ class Lehed:
                     break
         elif t == "del" and re.search(r"#(ow|erased)", el.get("rendition", "")):
             pass
+        elif ADD and t in PLIIATS_VALJA and pliiats(el):
+            pass
+        elif ADD and t == "subst":
+            self._sisu(el, jata=("del",))
+        elif ADD and t == "add" and set(el.get("place", "").split()) & ADD_PLACE \
+                and el.find(f".//{NS}lb") is None:
+            self.emit("<add>")
+            self._sisu(el, jata=("del",))
+            self.emit("</add>")
         elif t == "note" and (el.get("type") == "editorial" or not el.get("place")):
             pass
         elif t in ("note", "fw"):
@@ -113,10 +139,14 @@ class Lehed:
         if el.tail:                                  # tail kuulub vanemale, aga järjekorras siia
             self.emit(el.tail)
 
-    def _sisu(self, el):
+    def _sisu(self, el, jata=()):
         if el.text:
             self.emit(el.text)
         for c in el:
+            if tag(c) in jata:
+                if c.tail:
+                    self.emit(c.tail)
+                continue
             self.walk(c)
 
 
@@ -131,6 +161,10 @@ def lehe_tekst(tykid):
     s = "".join("\x00" if x == "\n" else x.replace("\n", " ") for x in tykid)
     s = s.replace("ſ", "s")
     read = [re.sub(r"\s+", " ", r).strip() for r in s.split("\x00")]
+    if ADD:   # tühik tägist väljapoole, mitte sisu servale; tühi lisandus välja
+        read = [re.sub(r"<add>\s+", " <add>", r) for r in read]
+        read = [re.sub(r"\s+</add>", "</add> ", r) for r in read]
+        read = [re.sub(r" {2,}", " ", re.sub(r"<add></add>", "", r)).strip() for r in read]
     return "\n".join(r for r in read if r)
 
 

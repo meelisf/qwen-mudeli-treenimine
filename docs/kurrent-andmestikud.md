@@ -735,3 +735,19 @@ leht sisse ainult kui iga mudelirida sai vaste ja Riegeri lehe tekstist ei jää
 midagi üle; reakaupa sarnasusskoor (Leibniz: ≥ 0,7, pikkus 80–100 %); mudel jätab
 ridu vahele → naaberreale liimitud tekst püüda reapikkuse kontrolliga. Klingeri eval
 (~20 käsitsi kontrollitud lehte) eraldada ENNE treeningut.
+
+## v5 (2026-10-12): ladina + Klinger + DTA `<add>`
+
+Ehitatud `scripts/build_kurrent_v5.py` → `data/kurrent_v5` (19 355 rida, holdout 145); detailid ja
+treeningu eeltingimused SEIS §3.4f. Allikapõhised otsused:
+
+- **DTA**: `build_dta_kosmos.py --add` (VUTT ADR 0067). Rea kohale/alla/veerisele kirjutatud lisandus
+  `<add>` lisamiskohas; `<subst>`-i kustutatud osa välja (v4 kleepis „oderund"); pliiatsikäe
+  (`hand` sisaldab „pencil") add/note/fw välja — DTA handNote järgi enamasti tundmatu hilisem käsi
+  või arhivaar (Hufelandil autor ise — välja jäetud järjekindluse pärast). `across` = ülekirjutus,
+  märgendita.
+- **Leibniz** (eScriptorium PAGE): `InterlinearLine` 329 rida, mediaan 1 sõna — lisandused, aga
+  sõnakoordinaate ei ole → omaette rida. Maha tõmmatud tekst on GT-s märgendita sees (kasutaja 09.10:
+  sobib).
+- **Klinger** (VUTT #576): käsitsi pildi järgi üle vaadatud VUTT-i „Valmis"-lehed, 55 `<add>`;
+  `<m>` → tavatekst; ⸗ → ¬.
