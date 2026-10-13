@@ -509,6 +509,33 @@ KAT_PILT = "pilt"
 KAT_MUDEL = "mudel"
 KAT_KIRJUTUS = "kirjutus"
 
+#: Märge kärbitud väljundi lõpus (llama-server `finish_reason == "length"`,
+#: kordusloopi ei ole). Nähtav tekst, mitte .err: tekst kuni katkemiseni on
+#: kasutatav, aga .err on VUTT-is lõplik (ADR 0025) ja peidaks selle. Varem jõudis
+#: 4096 tokeni juures katkenud leht VUTT-i tavalise .txt-na ilma ühegi jäljeta.
+KARBITUD_MARGE = "[OCR katkes: mudel ei jõudnud lehe lõpuni]"
+
+
+def kirjuta_atomaarselt(path, text):
+    """Kirjutab `{path}.tmp`-i ja nimetab samas kataloogis ümber (`os.replace`).
+
+    Tellija (VUTT-i SFTP poll) otsustab faili OLEMASOLU järgi. Otse lõppnimesse
+    kirjutades oli aken, kus .txt on olemas, aga veel tühi — ja tühi väljund ei
+    ole VUTT-is viga (ADR 0025), nii et leht oleks vaikselt tühjana imporditud.
+    `.txt.tmp` ei lõpe `.txt`/`.err`-iga, seega tellija ega see teenus ei loe seda.
+    """
+    tmp = "{}.tmp".format(path)
+    try:
+        with open(tmp, "w", encoding="utf-8") as f:
+            f.write(text)
+        os.replace(tmp, path)
+    except BaseException:
+        try:
+            os.unlink(tmp)
+        except OSError:
+            pass
+        raise
+
 
 def write_err_marker(txt_path, exc, kategooria):
     """Kirjutab lehe kõrvale .err märgendi, et tellija saaks vea kohe kätte.
@@ -525,14 +552,16 @@ def write_err_marker(txt_path, exc, kategooria):
     err_path = Path(txt_path).with_suffix(".err")
     msg = "{}: {}: {}".format(kategooria, type(exc).__name__, exc)
     try:
-        err_path.write_text(msg[:500] + "\n", encoding="utf-8")
+        kirjuta_atomaarselt(err_path, msg[:500] + "\n")
         logger.error("Vea märgend {}: {}".format(err_path.name, msg[:200]))
     except Exception as e:
         logger.error("Ei suutnud .err märgendit kirjutada {}: {}".format(err_path, e))
 
 
-def process_batch_http(batch_items, model_type):
-    """Sama töö llama-serveri kaudu. Sama .err semantika mis unslothi rajal.
+def _http_paring(item, model_type):
+    """Üks leht llama-serveri kaudu. Sama .err semantika mis unslothi rajal.
+
+    Tagastab `(txt_path, tekst, finish_reason)` või None (siis on .err kirjutatud).
 
     Kolm asja, mis on mõõdetud ja mida ei tohi tagasi keerata
     (docs/arhiiv/llamacpp-juurdlus-20260827.md):
@@ -549,73 +578,115 @@ def process_batch_http(batch_items, model_type):
     `StoppingCriteria`-t), seega tuvastatakse ta valminud väljundist
     `loop_detect.is_looped()`-iga – mõõdetult sama hea.
     """
-    if not batch_items:
-        return
-
     import base64, io, json, urllib.request
-    from concurrent.futures import ThreadPoolExecutor
 
-    def uks(item):
-        img_path, txt_path = item
-        try:
-            with PILImage.open(img_path) as im:
-                pilt = fit_to_grid(im.convert("RGB"))
-            buf = io.BytesIO()
-            pilt.save(buf, "PNG", optimize=False)
-        except Exception as e:
-            logger.error(f"Viga pildi avamisel {img_path}: {e}")
-            write_err_marker(txt_path, e, KAT_PILT)
-            return None
-        uri = "data:image/png;base64," + base64.b64encode(buf.getvalue()).decode()
-        keha = json.dumps({
-            "model": model_type,
-            "messages": [{"role": "user", "content": [
-                {"type": "text", "text": get_instruction(model_type)},
-                {"type": "image_url", "image_url": {"url": uri}},
-            ]}],
-            "max_tokens": 4096,
-            "temperature": 0,
-            # Mõtlemine on selle peenhäälestuse jaoks jaotusest väljas: mõõdetult
-            # jääb <think> tühjaks ja mudel põletab kõik 4096 tokenit.
-            "chat_template_kwargs": {"enable_thinking": False},
-        }).encode("utf-8")
-        req = urllib.request.Request(
-            f"{LLAMACPP_ENDPOINTS[model_type]}/v1/chat/completions", data=keha,
-            headers={"Content-Type": "application/json"})
-        try:
-            with urllib.request.urlopen(req, timeout=LLAMACPP_TIMEOUT) as r:
-                vastus = json.loads(r.read())
-            return txt_path, strip_output(vastus["choices"][0]["message"]["content"])
-        except Exception as e:
-            logger.exception(f"llama-server päring ebaõnnestus {img_path}: {e}")
-            write_err_marker(txt_path, e, KAT_MUDEL)
-            return None
+    img_path, txt_path = item
+    try:
+        with PILImage.open(img_path) as im:
+            pilt = fit_to_grid(im.convert("RGB"))
+        buf = io.BytesIO()
+        pilt.save(buf, "PNG", optimize=False)
+    except Exception as e:
+        logger.error(f"Viga pildi avamisel {img_path}: {e}")
+        write_err_marker(txt_path, e, KAT_PILT)
+        return None
+    uri = "data:image/png;base64," + base64.b64encode(buf.getvalue()).decode()
+    keha = json.dumps({
+        "model": model_type,
+        "messages": [{"role": "user", "content": [
+            {"type": "text", "text": get_instruction(model_type)},
+            {"type": "image_url", "image_url": {"url": uri}},
+        ]}],
+        "max_tokens": 4096,
+        "temperature": 0,
+        # Mõtlemine on selle peenhäälestuse jaoks jaotusest väljas: mõõdetult
+        # jääb <think> tühjaks ja mudel põletab kõik 4096 tokenit.
+        "chat_template_kwargs": {"enable_thinking": False},
+    }).encode("utf-8")
+    req = urllib.request.Request(
+        f"{LLAMACPP_ENDPOINTS[model_type]}/v1/chat/completions", data=keha,
+        headers={"Content-Type": "application/json"})
+    try:
+        with urllib.request.urlopen(req, timeout=LLAMACPP_TIMEOUT) as r:
+            vastus = json.loads(r.read())
+        valik = vastus["choices"][0]
+        return txt_path, strip_output(valik["message"]["content"]), valik.get("finish_reason")
+    except Exception as e:
+        logger.exception(f"llama-server päring ebaõnnestus {img_path}: {e}")
+        write_err_marker(txt_path, e, KAT_MUDEL)
+        return None
 
+
+def _salvesta_http_tulemus(t, jrk=""):
+    """Kordusloop → .err; max_tokens täis → tekst + KARBITUD_MARGE; muidu .txt."""
+    if t is None:
+        return
+    txt_out_path, clean_text, finish_reason = t
+    nimi = os.path.basename(txt_out_path)
+    leid = is_looped(clean_text)
+    if leid:
+        periood, kordused = leid
+        write_err_marker(txt_out_path, KordusLoop(
+            "periood {} sõna, {} kordust — tuvastatud valminud väljundist".format(
+                periood, kordused)), KAT_MUDEL)
+        return
+    if not clean_text.strip():
+        logger.warning(f"Tühi väljund: {nimi} — mudel ei genereerinud teksti")
+    if finish_reason == "length":
+        # Kordust ei ole (see läks .err-iks ülal), seega on see päriselt pikk
+        # leht (sageli topeltleht), mille lõpp jäi genereerimata.
+        logger.warning(f"Kärbitud väljund: {nimi} — max_tokens täis, lisan märke")
+        clean_text = clean_text.rstrip() + "\n" + KARBITUD_MARGE
+    try:
+        kirjuta_atomaarselt(txt_out_path, clean_text)
+    except Exception as e:
+        logger.error(f"Ei suutnud kirjutada {txt_out_path}: {e}")
+        write_err_marker(txt_out_path, e, KAT_KIRJUTUS)
+        return
+    logger.info(f"Transkribeeritud: {nimi}{jrk}")
+
+
+def process_queue_http(tasks, model_type):
+    """Pidevalt täidetav järjekord: kuni BATCH_SIZE lehte korraga serveris.
+
+    Iga valminud leht salvestatakse kohe ja vabanenud kohale läheb kohe järgmine.
+    Varem käis töö nelikute kaupa (`pool.map`): kõige aeglasem leht (pikk tekst
+    või kordusloop kuni 4096 tokenit) hoidis kolm vabanenud serverislotti tühjana
+    ja ka valmis tulemused jõudsid kettale alles koos temaga.
+
+    Peatamisel (SIGTERM) uusi lehti ei saadeta; lennus olevad lõpetatakse ja
+    salvestatakse, nagu varem pooleli olev nelik.
+    """
+    from concurrent.futures import ThreadPoolExecutor, wait, FIRST_COMPLETED
+
+    n = len(tasks)
+    if not n:
+        return
+    lennus = {}   # future -> item
+    jargmine = 0
+    valmis = 0
     with ThreadPoolExecutor(max_workers=BATCH_SIZE) as pool:
-        tulemused = list(pool.map(uks, batch_items))
+        def saada_juurde():
+            nonlocal jargmine
+            while jargmine < n and len(lennus) < BATCH_SIZE and not shutdown_requested:
+                item = tasks[jargmine]
+                lennus[pool.submit(_http_paring, item, model_type)] = item
+                jargmine += 1
 
-    for t in tulemused:
-        if t is None:
-            continue
-        txt_out_path, clean_text = t
-        leid = is_looped(clean_text)
-        if leid:
-            periood, kordused = leid
-            write_err_marker(txt_out_path, KordusLoop(
-                "periood {} sõna, {} kordust — tuvastatud valminud väljundist".format(
-                    periood, kordused)), KAT_MUDEL)
-            continue
-        if not clean_text.strip():
-            logger.warning(f"Tühi väljund: {os.path.basename(txt_out_path)} — "
-                           f"mudel ei genereerinud teksti")
-        try:
-            with open(txt_out_path, "w", encoding="utf-8") as f:
-                f.write(clean_text)
-        except Exception as e:
-            logger.error(f"Ei suutnud kirjutada {txt_out_path}: {e}")
-            write_err_marker(txt_out_path, e, KAT_KIRJUTUS)
-            continue
-        logger.info(f"Transkribeeritud: {os.path.basename(txt_out_path)}")
+        saada_juurde()
+        while lennus:
+            tehtud, _ = wait(list(lennus), return_when=FIRST_COMPLETED)
+            for fut in tehtud:
+                item = lennus.pop(fut)
+                valmis += 1
+                try:
+                    _salvesta_http_tulemus(fut.result(), f" ({valmis}/{n})")
+                except Exception as e:
+                    # Ootamatu viga ühe lehe järeltöötluses ei tohi järjekorda
+                    # ega teenust katkestada (main'i sys.exit(1) tapaks kõik).
+                    logger.exception(f"Tulemuse käsitlemine ebaõnnestus {item[0]}: {e}")
+                    write_err_marker(item[1], e, KAT_KIRJUTUS)
+            saada_juurde()
 
 
 def process_batch(batch_items, model_type):
@@ -692,8 +763,7 @@ def process_batch(batch_items, model_type):
         if not clean_text.strip():
             logger.warning(f"Tühi väljund: {os.path.basename(txt_out_path)} — mudel ei genereerinud teksti")
         try:
-            with open(txt_out_path, "w", encoding="utf-8") as f:
-                f.write(clean_text)
+            kirjuta_atomaarselt(txt_out_path, clean_text)
         except Exception as e:
             # Kataloog võib olla katkestamise järel kadunud (VUTT ADR 0024).
             # Üksik kirjutusviga ei tohi tsüklit ega teenust katkestada.
@@ -756,15 +826,17 @@ def main_loop():
                 if not tasks or shutdown_requested:
                     continue
                 ensure_model(mt)
+                if ENGINE_CONFIGS.get(mt) == "llamacpp":
+                    logger.info(f"[{mt}] Töötlen {len(tasks)} lehte, kuni {BATCH_SIZE} korraga")
+                    process_queue_http(tasks, mt)
+                    gc.collect()
+                    continue
                 for i in range(0, len(tasks), BATCH_SIZE):
                     if shutdown_requested:
                         break
                     batch = tasks[i:i + BATCH_SIZE]
                     logger.info(f"[{mt}] Töötlen {i+1}–{min(i+BATCH_SIZE, len(tasks))} / {len(tasks)}")
-                    if ENGINE_CONFIGS.get(mt) == "llamacpp":
-                        process_batch_http(batch, mt)
-                    else:
-                        process_batch(batch, mt)
+                    process_batch(batch, mt)
                     gc.collect()
             logger.info("Kõik hetke tööd tehtud. Ootan uusi...")
             last_heartbeat = time.time()
