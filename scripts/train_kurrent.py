@@ -81,6 +81,9 @@ BATCH = 1                           # --batch=N
 GRAD_ACC = 4 if TEST_MODE else 8    # --grad-acc=N
 NO_GC = "--no-gc" in sys.argv       # gradient checkpointing välja
 WORKERS = 0                         # --workers=N
+# Andmestik ja juhis käivad koos: KURRENT_INSTRUCTION_V5 (<add>) eeldab v5 GT-d.
+# Vana data/kurrent (v4) ei sisalda <add>-i — selle jaoks anna --data-dir selgesõnaliselt.
+DATA_DIR = "data/kurrent_v5"        # --data-dir=<kaust>
 
 for i, arg in enumerate(sys.argv):
     if arg.startswith("--base="):
@@ -101,6 +104,8 @@ for i, arg in enumerate(sys.argv):
         GRAD_ACC = int(arg.split("=", 1)[1])
     elif arg.startswith("--workers="):
         WORKERS = int(arg.split("=", 1)[1])
+    elif arg.startswith("--data-dir="):
+        DATA_DIR = arg.split("=", 1)[1].rstrip("/")
 
 # Kas baasmudel on lokaalne checkpoint (LoRA juba küljes) või HF mudel?
 FROM_CHECKPOINT = Path(BASE_MODEL).exists()
@@ -110,15 +115,19 @@ print(f"Batch: {BATCH} x grad_acc {GRAD_ACC} = {BATCH * GRAD_ACC}, "
 if not FROM_CHECKPOINT:
     print(f"HF baasmudel – get_peft_model() kutsutakse (rank={LORA_RANK})")
 
-DATA_CSV    = "data/kurrent/metadata.csv"
-DATA_IMAGES = "data/kurrent/images"
+DATA_CSV    = f"{DATA_DIR}/metadata.csv"
+DATA_IMAGES = f"{DATA_DIR}/images"
 
 # Holdout: ~70 lehte, mis jäävad treeningust välja, et mudeleid saaks
 # omavahel võrrelda. Nimekirja teeb scripts/make_holdout.py ja see on
 # repositooriumis – ilma selleta ei ole hilisem võrdlus aus.
 # --no-holdout treenib kõige peal (nt lõplik mudel pärast katsetamist).
-HOLDOUT_PATH = "data/kurrent/holdout.txt"
+HOLDOUT_PATH = f"{DATA_DIR}/holdout.txt"
 USE_HOLDOUT  = "--no-holdout" not in sys.argv
+if USE_HOLDOUT and not Path(HOLDOUT_PATH).exists():
+    # Vaikne „treenin kõige peal" rikuks hilisema võrdluse — peatu enne mudeli laadimist
+    print(f"Viga: holdout puudub ({HOLDOUT_PATH}); kõige peal treenimiseks anna --no-holdout")
+    sys.exit(1)
 
 DATE_STAMP  = datetime.now().strftime("%Y%m%d")
 OUTPUT_PATH = f"models/qwen3.5-ocr-kurrent-{DATE_STAMP}"
@@ -205,6 +214,7 @@ else:
         lora_dropout=0,
         bias="none",
         random_state=3407,
+        use_gradient_checkpointing=False if NO_GC else "unsloth",
     )
     print(f"LoRA adapterid lisatud (r={LORA_RANK}).")
 model.print_trainable_parameters()
@@ -329,7 +339,7 @@ if len(dataset) == 0:
 # Treener
 # ---------------------------------------------------------------------------
 
-FastVisionModel.for_training(model)
+FastVisionModel.for_training(model, use_gradient_checkpointing=not NO_GC)
 
 gpu_stats = torch.cuda.get_device_properties(0)
 print(f"GPU: {gpu_stats.name}, mälu: {round(gpu_stats.total_memory / 1024**3, 1)} GB")
@@ -368,6 +378,7 @@ trainer = SFTTrainer(
         save_strategy="no" if TEST_MODE else "steps",
         save_steps=SAVE_STEPS,
         save_total_limit=3,
+        gradient_checkpointing=not NO_GC,   # TRL-i vaikimisi True — muidu --no-gc ei mõju
     ),
 )
 
@@ -390,6 +401,11 @@ class EpohhiLopuAdapter(TrainerCallback):
 
 
 trainer.add_callback(EpohhiLopuAdapter())
+
+# Tegelik olek, mitte lipp: Unsloth ja TRL seavad checkpointingu mitmes kohas uuesti
+_gc_moodulid = sum(1 for m in model.modules() if getattr(m, "gradient_checkpointing", False))
+print(f"Gradient checkpointing tegelikult: args={trainer.args.gradient_checkpointing}, "
+      f"mooduleid sees={_gc_moodulid}")
 
 if not TEST_MODE:
     print(f"Checkpoint iga {SAVE_STEPS} sammu järel (~{SAVE_STEPS * 27.9 / 3600:.1f} h), "
