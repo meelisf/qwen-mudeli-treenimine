@@ -715,6 +715,29 @@ Järeldus: e-manuscripta ei lappi ladina auku. Toores Baseli HTR (sadu ladina ki
 16.–17. saj) võiks olla toorik käsitsi parandamiseks, aga see on sama töö mis
 VUTT-i oma lehtede parandamine.
 
+### Otsitud 14.10 (kaks agenti), ladina käsikiri — suurt puhast avalikku allikat EI OLE
+
+| kandidaat | seis | otsus |
+|---|---|---|
+| **Bullinger, käsitsi parandatud diplomaatiline alamkogu** (2025 uurimus, Subset 2: 50 lk / 49 kirja / 1 486 rida; read, poolitused, lühendid säilitatud) | artikli GitHubis alamkogu EI OLE | küsida autoritelt (Subset 2 + täislehepildid); kontrollida kattuvust meie Bullingeri treeningu/holdoutiga; kõik lehed ei pruugi olla ladina |
+| **Gasparo Sardi „Toponomasia"** (1561–70, üks käsi, 49 ALTO, GT CC BY 4.0, diplomaatiline, read säilitatud) | pildid ainult küsides (README: Pauline Jacsont) | küsida pilte |
+| **Newton Project** (17. saj lõpp / 18. saj algus, diplomaatiline XML, `<lb>` alles, faksiimileviited; proov NATP00369: 105 `<lb>`) | tekst CC BY-NC-ND 3.0, märgenduses parandused/kustutused/valemid; sobivate lehtede arv teadmata | järgmine uurimissuund: litsents + ladina, vähe valemeid, pildiga kaetud lehed |
+| TRIDIS (HF `magistermilitum/Tridis`) | ladina keskaegne; 16. saj humanistlik = Bullinger (olemas), CODEA (hisp.) | ei |
+| Nationaal Archief „Miscellaneous archives" (Zenodo 17610255, 1 879 lk PAGE, CC BY) | ainult hollandi | ei |
+| Vrančić 1553 (GAMS, TEI `<lb>`, CC BY) | faksiimile = trükitud editsioon | ei |
+| Greifswald Rechtsprechung (de+la, 17.–18. saj) | avalik ainult mudel | ei |
+| ubtue/Ground-Truth | peale Senatsprotokolle ainult Hennigi päevikud (20. saj) | ei |
+
+**Konsensusfilter** (v5 üle Bullingeri/Leibnizi automaat-GT, alles lehed madala CER-iga) = KANDIDAATIDE valik, mitte puhta GT
+tõend: Zürichi auditis jätsid mudel ja GT samu ridu vahele ja CER oli ikka madal; v5 on samal allikaringil treenitud
+(lugejad ei ole sõltumatud); Leibniz noisy jätab vasteta HTR-read tühjaks. Kui kasutada: kontrolli ka nähtava teksti
+katvust (ridade arv vs pildi read), juhuvalim pildi järgi; ainult treeningusse, eval käsitsi kontrollitud GT-ga.
+
+**VUTT ise (14.10):** ladina käsikirjalehti Toores 1 916, Töös 54, Parandatud 3, Valmis 16 (9 teost). Kõige väärtuslikum
+lisand = 100–150 lehte eri kirjutajatelt/žanridest v5 + Gemini eel-OCR-iga, käsitsi parandatud; hindamiskomplekt eraldada
+ENNE treeningut kirja/dokumendi kaupa. Riksarkivet `satrn_htr` kaart: „50–60 transcribed pages is enough to halve the CER
+on 17th century documents", aga sama kaardi tabel näitab 17. saj 0,095 → 0,084 — EI ole lubadus meie Qweni ladinale.
+
 ## Plaan: Klingeri kirjad + Riegeri Briefbuch (2026-10-10, planeerimisel)
 
 Idee: Tartu Klingeri kirjad VUTT-i (`klingeriana`, osa digiteerimata); Rieger 1896
