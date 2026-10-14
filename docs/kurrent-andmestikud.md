@@ -830,3 +830,38 @@ xix_1900 590, xix_1800_49 381, bergskoll 313, trolldom 273, xix_1850_99 233, sen
 ridu = pilte. Holdout 132 (−13), neist `<m>`-iga 26 lehte / 128 rida, `<add>` 14.
 
 **Lahtine:** SEIS §6 p 14.
+
+## Klapitused editsiooniga (2026-10-15)
+
+### Klingeri kirjad: katvus Riegeri vastu
+
+VUTT-i kirjateosed `671arc` (44 lk), `ffqg7z` (10), `t9zd42` (153) = 207 lehte (üksikkirjade teosed on duplikaatidena
+kustutatud 11.10). **Valmis + GT-s 92**; Riegeri vastega, aga ülevaatusest välja jäänud **38** (lipuread > 3, Riegeri
+järjekord, kuupäevarida, toimetaja sulud — klapitusskriptidega uuesti); **Riegeri vasteta 77** — ~14 lühikest
+(aadress/ümbrik), ~63 täislehte ~28 kirjast, mida Riegeri VALIMIKUS ei ole (Riegeril 65 Morgensterni kirja, osa
+katkenditena „— —"; t9zd42 puuduvad nt 18.02./27.08./24.10./18.11.1813, 1814 juuli–dets, 1815 jaan/juuni/aug/okt,
+1817, 12.01.1822, 09.01.1823) → ainult käsitsi v5 OCR-i pealt. Lehtede nimekiri: tööriistakäsk vestluses 15.10
+(staatused serverist, `joondus_kokkuvote.txt`, `klinger_ulevaatus.json`).
+
+### Academia Gustaviana põhikiri `jbc88t` ↔ Vasar 1932 (`tvh4im`)
+
+Vasar, *Tartu Ülikooli ajaloo allikaid I a* (1932), põhikiri trükk lk 39–73 = VUTT `tvh4im` lk 131–165 (VUTT-i
+trükimudeli OCR, puhas: æ, qv, joonealused). Vasari alus on SAMA käsikirja tekst (Baumanni ärakiri `jbc88t`, 39 skann):
+„MDXXX", „MDXCIII", „verbali", „Castellaneo (arcis præfecto)" klapivad rida-realt.
+
+- `scripts/vasar_ocr_jbc88t.py` — jbc88t v5-ga (8081, V5 juhis, fit_to_grid+PNG) → `data/vasar/ocr_v5/` (VUTT-i ei kirjuta).
+  v5 normaliseerib: käsikirja `&` → „et", qv → qu, æ → ae; reajaotus õige.
+- `scripts/vasar_klapitus.py` — mudeli READ + Vasari TEKST (Riegeri `joonda`/`lev`). Vasari teisendused tagasi:
+  joonealune „N) Msc.: X" → märgiga sõna(d) → X (käsikirja lugem; joonealused algavad alati „1)"-ga, põhiteksti
+  punktid on samal kujul — lk 153); `[toimetaja lisand]` välja; sõnasisene `[laiendus]` („J[uris]c[onsul]ti",
+  „v[ero]") välja + lipp. Ankur iga lehe jaoks märgi-5-grammidega kogu Vasari tekstist (järjekord erineb);
+  vasteta leht (mediaan cer > 0,4: tiitel, raamatukogu, „15 Octobr Ao 1632" ees) positsiooni ei nihuta;
+  sidekriipsuta poolitus („fa / cultatum") ei nihuta lõiget tühikuni.
+- **Tulemus** `data/vasar/klapitus.{json,md}`: 35 sisulehte, **1 165 rida**, lipuga 83 (Vasari teisendus, mis
+  mudeliga lahkneb 64; cer > 0,35 19). Teisendusega ridadest 148/215 klapib mudeliga (cer ≤ 0,10) = Msc.-lugemi
+  taastamine kinnitatud. Lehed 25–30 kesk cer 2–7 %; nõrgemad 31 (nimed: mudel vigane, Vasar õige), 36, 38–39
+  (teine käsi, marginaalsed punktinumbrid). **Vahe:** Vasari ~1 600 märki (Cap. XXI V–VI, Cap. XXII algus) ei vasta
+  ühelegi skannile — käsikirjast puudub leht või skann.
+- **LAHTI (kasutaja otsus):** (1) käsikirja `&` — Vasar ja v5 annavad „et"; diplomaatiline GT vajaks `&`-i
+  (treeningus Leibniz 58, hanse17 89) → käsitsi ülevaatusel või aktsepteerida; (2) VUTT-i kirjutamine (Klingeri
+  muster: tekst + lehesilt + kommentaar lipuridadega → ülevaatus → „Valmis" → GT) — ootab luba.
