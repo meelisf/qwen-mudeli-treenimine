@@ -99,9 +99,9 @@ Return only the transcription."""
 # v5 juhis (andmestik v5m, 13.10.2026): GT kannab interlineaarset lisandust
 # `<add>…</add>` lisamiskohas (VUTT ADR 0067) ja veerist `<m>…</m>` ridadena omal
 # kohal (ADR 0009; sõnastus nagu trükijuhise p 10). Erineb ainult punkti 7 poolest.
-# Kasutavad AINULT train_kurrent.py ja eval_kurrent.py --prompt kurrent_v5;
-# teenus (kataloogi-jalgimine-ja-ocr.py) jääb KURRENT_INSTRUCTION-i peale, kuni
-# v5 mudel tootmisse läheb — siis lülitada teenus ja VUTT-i juhis koos ümber.
+# Tootmises alates 14.10.2026 (v5 mudel kurrent-20261013): teenus
+# (kataloogi-jalgimine-ja-ocr.py) ja reocr_vutt.py kasutavad seda; vana
+# KURRENT_INSTRUCTION jääb v4 ja vanemate mudelite hindamiseks (--prompt kurrent).
 _P7_VANA = "7. Do not add any XML tags, markdown, or formatting — plain text only."
 _P7_V5 = ("7. Insertions written above or below the line, or in the margin with a mark showing where\n"
           "   they belong: transcribe them at that point as <add>text</add>.\n"

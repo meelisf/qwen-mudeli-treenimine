@@ -46,7 +46,7 @@ sys.path.insert(0, str(Path(__file__).parent))
 from build_vutt_dataset import read_work_type
 from imaging import MAX_PIXELS, fit_to_grid
 from loop_detect import is_looped
-from prompt import INSTRUCTION, KURRENT_INSTRUCTION
+from prompt import INSTRUCTION, KURRENT_INSTRUCTION_V5
 
 VUTT_ROOT = Path.home() / "vutt-backups/latest/data"
 OUT_ROOT  = Path("data/vutt/reocr")
@@ -95,7 +95,7 @@ while i < len(args):
     else:
         OUT_NAME = a; i += 1
 
-PROMPT = INSTRUCTION if MATERIAL == "print" else KURRENT_INSTRUCTION
+PROMPT = INSTRUCTION if MATERIAL == "print" else KURRENT_INSTRUCTION_V5   # v5 tootmises 14.10
 
 # ---------------------------------------------------------------------------
 # Kandidaadid

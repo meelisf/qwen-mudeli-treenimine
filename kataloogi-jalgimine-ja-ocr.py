@@ -33,7 +33,7 @@ from transformers import StoppingCriteria
 from unsloth import FastVisionModel
 from natsort import natsorted
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "scripts"))
-from prompt import INSTRUCTION, KURRENT_INSTRUCTION
+from prompt import INSTRUCTION, KURRENT_INSTRUCTION_V5
 from imaging import MAX_PIXELS, fit_to_grid
 from loop_detect import is_looped
 
@@ -272,9 +272,13 @@ def ensure_model(model_type: str):
 #: hindamine (scripts/eval_kurrent.py vaikimisi) tehti seevastu
 #: KURRENT_INSTRUCTION-iga. Lahknevus on nüüd kaotatud: teenus ja hindamine
 #: kasutavad sama juhist.
+#:
+#: Alates 14.10.2026 (v5 mudel kurrent-20261013) `KURRENT_INSTRUCTION_V5`:
+#: erineb ainult p 7 poolest — `<add>` lisamiskohas (VUTT ADR 0067) ja veeris
+#: `<m>`-ridadena. Mudel ja juhis vahetuvad KOOS (llama-server-hand.service).
 INSTRUCTIONS = {
     "print": INSTRUCTION,
-    "hand":  KURRENT_INSTRUCTION,
+    "hand":  KURRENT_INSTRUCTION_V5,
 }
 
 
