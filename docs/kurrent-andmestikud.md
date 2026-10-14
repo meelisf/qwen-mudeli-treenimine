@@ -751,3 +751,59 @@ treeningu eeltingimused SEIS §3.4f. Allikapõhised otsused:
   sobib).
 - **Klinger** (VUTT #576): käsitsi pildi järgi üle vaadatud VUTT-i „Valmis"-lehed, 55 `<add>`;
   `<m>` → tavatekst; ⸗ → ¬.
+
+## v6 (2026-10-14): veeris `<m>` ja interlineaar `<add>` PAGE XML-ist
+
+Ehitatud `scripts/build_kurrent_v6.py` → `data/kurrent_v6` (alus `data/kurrent_v5m`, pildid hardlink);
+SEIS §3.4h. **18 238 lehte (v5m 19 355), holdout 132, `<m>`-ridu 12 128, `<add>` 2 176.**
+
+**Miks:** v5-s kandis `<m>`-i ainult Leibniz + DTA; PAGE XML-i allikates olid veerise read lugemisjärjekorras
+(sageli lehe alguses/lõpus) märgendita → mudel pani kantseleikäte veerise märgendita lõppu (VUTT agnp5i).
+
+**Toorikud:** Riksarkivet 7 (`raw_xml/riksarkivet` tar.gz), senatsprotokolle (`ubtue-gt`), hanse XVI/XVII ja
+kurrent-xix (sh Escher) HF-ist uuesti `scripts/fetch_raw_xml_v6.py`-ga (ainult `xml_content` veerg,
+HfFileSystem + pyarrow, ~256 MB) → `raw_xml/{hanse_xvi,hanse_xvii,kurrent_xix}`. XML seotakse v5m reaga
+normaliseeritud teksti järgi; **tekst tuleb v5m GT-st reaindeksi järgi** (makron, ſ→s jm teisendused jäävad;
+XML↔GT ridade arv klappis KÕIGIL seotud lehtedel; `xml_sidumata` 88 = v5m-ist varem filtreeritud).
+
+**Veerise tuvastus** (`veeris_tuvastus.analyysi`, reeglid kasutaja pildikontrolliga 14.10, `data/v6_veeris/KONTROLL.md`):
+põhiplokid = laiad regioonid; veeru tuum = ridade mediaan x0..x1; regiooni keskpunkt tuumast väljas ja y kattub
+mõne plokiga → veeris; tekst kõigi plokkide kohal → päis, all → jalus; number kohal → veeris (svea „1020.");
+naaberleht = kaugus > 0,5 või (laius > 0,3 ja kaugus > 0,28); ploki viimane rida paremal = püüdsõna.
+
+**Reeglid (SÜMMEETRILISED** — kasutaja: ühe poole eelistamine õpetaks teise poole veerist vahele jätma):
+| juhtum | otsus | lehti |
+|---|---|---|
+| veeris eraldi regioonina | `<m>` iga rida omaette, peremeesploki ette esimese põhirea ette, mille keskpunkt on allpool | 2 549+ |
+| ploki-sisene rida, ainult number | `<m>` | — |
+| muu ploki-sisene kandidaat (taane, ületäie sõna, tabel või päris veeris) | leht välja | 586 |
+| kahe lehekülje laotus ühes regioonis | leht välja | 122 |
+| naaberlehe/dorsaali tekst | read GT-st välja (sama reegel mis VUTT Gemini juhis, PR #600) | 151 |
+| tabel (≥ 15 veeriserida, > 40 % numbrid; xix 075047 metsatabelid) | leht välja | 18 |
+| rööptekst (veerise tekst > 0,5 põhiteksti pikkusest; hanse17 237-0012/0013) | leht välja | 4 |
+
+Rööptekst: ridade arv ja sõna/märgikattuvus EI erista (rüütelkonna teemaveerud 12–30 rida, svea veerised kordavad
+nimesid 0,7–0,8); eristab pikkus (rööptekst ~0,8, päris veeris ≤ 0,45).
+
+**Duplikaadid (identne pilt, md5):** sama tekst 45 → üks alles; erinev tekst 342 → KÕIK treeningliikmed välja
+(aaeb part-2 `_4428135_` versioon on vigane: „Mille 1134 / Infermation fote des octes" vs „juillet 1579 /
+Information faicte des actes" — lühim EI ole diplomaatiline); holdouti liige jääb alati → leke kaob.
+
+**Interlineaarne lisandus → `<add>`** (6d8adaa; ADR 0067 vorm: lisamiskohas rea sees). Kandidaat = lühike rida
+(< 0,5 ploki rea mediaanlaiusest), baasjoon kahe JÄRJESTIKUSE põhirea A ja B vahel (B−A < 1,4 × reasamm), kattub
+x-is mõlemaga; lisandus läheb alumisse ritta B. Reaks jäävad (362): number/ordinaal („1:o"), < 2 tähte („╕"),
+nimekiri (A, L, B samast x-ist), retsept/tabel (kõik algavad numbriga), tsentreeritud pealkiri („VORTRAG / des"),
+A või B < 3 sõna. Koht: Riksarkiveti sõnakoordinaadid (kui sõnu sama palju kui GT-s; 47), lisamärk (`+ / #` jt;
+L-i alguses või ainus eraldiseisev märk B-s; 15), muidu x-i osakaal → lähim sõnapiir (972). **1 020 B-rida.**
+Enne filtrit juhuvalim 24: 14 õiget / 2 ebaselget / 8 vale; pärast juhuvalim 30: ~25 õiget. Teadaolevad vead:
+eelmise rea ületäie sõna („werden dick / verrührt."), päiseread („a Parte / Praes. / a Parte"). Kustutatud sõna
+kohal olev parandus jääb `<add>`-iks (GT-s kustutatud sõna enamasti puudub). Leibnizi `InterlinearLine` on
+endiselt omaette rida (sõnakoordinaate ei ole). Analüüs `scripts/v6_interlin.py`, valim `data/v6_veeris/interlin_add/`.
+
+**`<m>`-ridu allikati:** svea 3 918, Leibniz 1 976, hanse XVII 1 793, hanse XVI 941, DTA 847, krigs 636,
+xix_1900 590, xix_1800_49 381, bergskoll 313, trolldom 273, xix_1850_99 233, senats 158, muud ~70.
+
+**Kontrollid ehitusel:** `<m>`/`<add>` paaris kõigil lehtedel, pesastust ja reavahetust märgendi sees ei ole,
+ridu = pilte. Holdout 132 (−13), neist `<m>`-iga 26 lehte / 128 rida, `<add>` 14.
+
+**Lahtine:** SEIS §6 p 14.

@@ -276,7 +276,8 @@ def main():
         f"v5m {len(rows)} → {len(out)}  välja {len(valja)}, veeris <m>-iks {len(muudetud)} lehel; "
         f"{dict((a, dict(c)) for a, c in nimed.items())}  holdout −{len(ho_valja)}\n"
         "PAGE XML veeris → <m> (Riksarkivet 7, senatsprotokolle, hanse XVI/XVII, kurrent-xix), tuvastus scripts/veeris_tuvastus.py\n"
-        f"identse pildiga duplikaadid välja: {dict(dup)} (erinev tekst → kõik treeningliikmed välja)\n",
+        f"identse pildiga duplikaadid välja: {dict(dup)} (erinev tekst → kõik treeningliikmed välja)\n"
+        f"interlineaar → <add> rea B sisse: {dict(ILN)}\n",
         encoding="utf-8")
     print(f"valmis: {NEW}  (holdout −{len(ho_valja)})")
 

@@ -15,15 +15,16 @@ Viimati uuendatud: **06.10.2026**
 ## 1. Mis praegu tootmises jookseb
 
 > Trükipool `print-base-r64-mi-vl-20261006` alates 06.10 09:56 (koos makronijuhisega,
-> §4), käsikirjapool `kurrent-20261009` (andmestik v4, §3.4e) alates 11.10.
+> §4), käsikirjapool `kurrent-20261013` (andmestik v5m, §3.4g) alates 14.10, juhis
+> `KURRENT_INSTRUCTION_V5` (`<add>` + `<m>`).
 
 | teenus | port | mudel | alates |
 |---|---|---|---|
 | `llama-server-print` | 8080 | **`print-base-r64-mi-vl-20261006-Q8_0`** | 06.10 |
-| `llama-server-hand` | 8081 | **`kurrent-20261009-Q8_0`** | 11.10 |
+| `llama-server-hand` | 8081 | **`kurrent-20261013-Q8_0`** | 14.10 |
 | `ocr-service` | — | klient mõlemale, `ENGINE_CONFIGS` = llamacpp | — |
 
-GPU 24,3 / 32,6 GB. Mõlemal serveril **`--image-max-tokens 5000`**, klient teeb
+GPU ~26 / 32,6 GB (kumbki server ~12,7 GB, `-c 65536 -np 4`). Mõlemal serveril **`--image-max-tokens 5000`**, klient teeb
 **`fit_to_grid` + PNG**. Kõik kolm on kohustuslikud — §2.1.
 
 **Käivitamine pärast treeningut / reebooti (nõuab sudo-t):**
@@ -41,6 +42,7 @@ sudo systemctl start ocr-service
 
 | mudel | varukoopia |
 |---|---|
+| käsikiri → `kurrent-20261009` (v4) | GGUF kettal; unit'is `-m`/`--mmproj` JA juhis tagasi: `git revert b0ac210` (teenus + `reocr_vutt` V5) + VUTT `server/ocr_prompts.py` (PR #599/#600) |
 | käsikiri → `kurrent-20260829` | GGUF kettal; muuda unit'is `-m`/`--mmproj` |
 | trükk → `print-base-r64-mi-vl-20260828` | `/etc/systemd/system/llama-server-print.service.bak-20261006` + `git revert 8165e49` (makronijuhis) |
 | trükk → `print-base-r64-20260827` | GGUF kettal; `.bak-20260828` on veel vanem (`markup-20260722`) |
@@ -479,7 +481,7 @@ NB: `vordle_kurrent.py` rühmasildid („vanad 70", „uued 60") on v2 holdouti 
 loe rida „kõik". 04.10 eval-kaust jooksis enne makroni/ſ→s juhist, seega „vana vs vana" rida
 mõõdab juhise mõju, mitte determinismi.
 
-### 3.4f Andmestik v5 (12.10.2026) — EHITATUD, treening ootab (nädalavahetus)
+### 3.4f Andmestik v5 (12.10.2026) — treenitud 14.10, tootmises (§3.4g)
 
 `data/kurrent_v5` (`scripts/build_kurrent_v5.py`, kuivkäivitus `--dry-run`, uuesti `--uuesti`):
 **19 355 rida, holdout 145** (v4 130 + Leibniz val 10 + Klinger 5). Alus `data/kurrent` (v4 pärast
@@ -531,6 +533,36 @@ Põhjus: senatiprotokollides jms on professorid ja otsused veerisel — ilma `<m
    näitab redaktor täge toorena.
 5. VUTT-i Klingeri lehed on osaliselt AJUTISELT „Valmis" (76 lk, VUTT /data `git log --grep "ajutiselt Valmis"`)
    → hiljem tagasi „Parandatud"-ks; GT ehitada uuesti, kui lehti parandatakse.
+
+### 3.4g Treening v5 (13.–14.10.2026, TÜ HPC Rocket) — tootmises 14.10
+
+Rocket H200, töö 2265702: 17 h 24 min, 4 800 sammu, train_loss 0,2655 (lõpukadu ~0,15–0,17), ~39 €.
+Adapter `models/qwen3.5-ocr-kurrent-20261013` (sha256 klapib Rocketiga; epohh-1 adapterit EI toodud),
+GGUF `models/gguf/kurrent-20261013-{BF16,Q8_0}.gguf` + `mmproj-kurrent-20261013-F16.gguf`.
+
+Eval `scripts/kurrent_v5_eval.sh` (v5m holdout 145, Q8_0, CER märgenditeta; `eval_kurrent.py`/`vordle_kurrent.py`
+`--data-dir`, väljad gt_m/out_m/gt_add/out_add/cer_raw). Loopideta mediaan v4 2,6 % / v5 2,8 % (müra piires),
+**keskmine 13,4 → 7,1 %, loope 6 → 3**; Leibniz 23,7 → 18,0, Klinger 16,1 → 6,6. Halvemad: xix_read_1850_99
+2,9 → 5,9 (üks leht 17281 — GT lugemisjärjekord, veeris on XML-is ees), koenigsfelden 1,8 → 3,1, aaeb 2,9 → 3,5.
+Oesel lk 3 1,5 → 1,4 %. `<m>` GT 72 / v5 100 (v4 0), `<add>` GT 10 / v5 6. Nimekontroll holdoutil
+(nimekuju GT-s ja väljundis): v5 õige 648 vs v4 275.
+
+Tootmisse 14.10: `llama-server-hand` → `kurrent-20261013` (unit, kasutaja sudo); teenus + `reocr_vutt.py`
+`KURRENT_INSTRUCTION_V5` (b0ac210). VUTT: PR #599 (Gemini käsikirjajuhis p 7 = V5 p 7 + tekstinäide),
+PR #600 (naaberlehe tekst servas ei ole veeris). Tagasitee §1.
+
+### 3.4h Andmestik v6 (14.10.2026) — EHITATUD, treening ootab
+
+`data/kurrent_v6` (`scripts/build_kurrent_v6.py`, tuvastus `scripts/veeris_tuvastus.py`; LOSS 219c2c6,
+9a106bb, 6d8adaa): **18 238 lehte, holdout 132**, `<m>`-ridu 12 128 (v5m 2 825), `<add>` 2 176 (v5m 1 144).
+Veeris `<m>`-ina ja interlineaarsed lisandused `<add>`-ina KÕIGIS PAGE XML-i allikates, duplikaadid ja
+naaberlehe tekst välja. Reeglid, numbrid ja teadaolevad vead: `kurrent-andmestikud.md` „v6 (2026-10-14)".
+
+**Treeningul:** Rocketis on v5m pildid olemas → üles ainult `metadata.csv`, `holdout.txt`, `projektid.csv`,
+pildid hardlink v5m-ist; `train_kurrent.py --data-dir data/kurrent_v6`. Holdouti GT muutus (`<m>`, `<add>`,
+välja võetud lehed) → v6 eval EI ole v5 numbritega võrreldav; baasiks jooksuta v5 mudel v6 holdoutil.
+Kasutaja 14.10: treeninguga ootame, enne otsitakse veel materjali (eriti ladina). Arutelus: Gemini lagi
+v6 holdoutil mõõta; 27B käsikirjamudel (2 × 27B Q4 ei mahu 5090-sse, 27B Q4 + trükk 9B Q6 napilt).
 
 ### 3.5 Retsept, kui vaja korrata
 
@@ -672,7 +704,7 @@ ei tohi mälu järgi tsiteerida.
     Tehtud 09.10: `disp`, `tartu-acad`, `vanad - VUTT…`, `HTRflow-riksarkivet`,
     `EstLLM-finetune` kustutatud (279 GB); CUDA koristus §1.2.
 
-13. **Kurrendi v5 andmestik** — **EHITATUD 12.10, vt §3.4f** (allikad a–d sees; Klinger =
+13. **Kurrendi v5 andmestik** — **EHITATUD 12.10 (§3.4f), TOOTMISES 14.10 (§3.4g); v6 ehitatud 14.10 (§3.4h)** (allikad a–d sees; Klinger =
     `klinger_gt_vutt`, mitte allolev automaatklapitus). Algne kirje (10.10,
     v4 treeningu ajal). Järgmine Kurrendi ehitus = v4 + järgmised allikad:
     (a) **Leibniz clean** 248 lk, `DenisaBumba/htr_leibniz_dataset_v1`, CC BY 4.0;
@@ -693,6 +725,13 @@ ei tohi mälu järgi tsiteerida.
         05nctg; 1816. a üksikkirjade teosed on SAMA skaneering mis t9zd42 → dedubleeritud.
         Värav τ=0,6 + vahe ≤5 + ilma Riegeri kuupäevareata (ka kirja lõpus) + ilma toimetaja
         nurksulgudeta + ≥6 rida (aadresslehed välja). Servaread välja — kasutaja otsus „vaatame hiljem".
+
+14. **v6 lahtised (14.10):** (a) aaeb part-2 (`…_4428135_…`, 68 lk) GT kvaliteet kahtlane — erineva
+    tekstiga duplikaadid välja, ülejäänud sarja lehed sees; (b) leheküljenumbrid lähevad `<m>`-i (hall vs
+    punane kontrollpiltidel) — eraldi märgend oleks TEI `<fw type="pageNum">`, VUTT-is ADR-i otsus;
+    (c) vasaku lehe veeris on lähte-XML-is osaliselt transkribeerimata (bergskoll 12729, trolldom 14172,
+    14725, 14776) — pildipõhine kontroll; (d) interlineaari teadaolevad vead (eelmise rea ületäie sõna,
+    päiseread); (e) ladina materjali juurde (kasutaja 14.10).
 
 Punktid 5, 7, 9, 10 pärinevad
 `docs/arhiiv/treening-ja-inferentsi-koodi-ulevaade-20260828.md`-st.
