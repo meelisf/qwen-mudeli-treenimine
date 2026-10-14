@@ -209,6 +209,27 @@ def xmlid():
     for p in sorted((RAW / "ubtue-gt").rglob("*.xml")):
         if "Senatsprotokolle" in str(p):
             yield "senatsprotokolle", p.stem, p.read_text(encoding="utf-8", errors="replace")
+    # v6 (14.10): HF-ist uuesti alla laaditud (scripts/fetch_raw_xml_v6.py)
+    for kaust, allikas in (("hanse_xvi", "hanse_kurrent_xvi"), ("hanse_xvii", "hanse_kurrent_xvii")):
+        for p in sorted((RAW / kaust).rglob("*.xml")):
+            yield allikas, p.stem, p.read_text(encoding="utf-8", errors="replace")
+    proj_allikas = xix_projektid()
+    for p in sorted((RAW / "kurrent_xix").rglob("*.xml")):
+        a = proj_allikas.get(p.parent.name)
+        if a:
+            yield a, p.stem, p.read_text(encoding="utf-8", errors="replace")
+
+
+def xix_projektid():
+    """kurrent-xix projekt → v5m allikas (xix_read_<periood>), v5m projektid.csv + metadata järgi."""
+    al = {r["failinimi"]: r["allikas"] for r in csv.DictReader(open(GT_CSV, encoding="utf-8"))}
+    out = {}
+    pr = GT_CSV.parent / "projektid.csv"
+    if pr.exists():
+        for r in csv.reader(open(pr, encoding="utf-8")):
+            if len(r) > 1 and r[0] in al and al[r[0]].startswith(("xix_read", "kurrent_xix")):
+                out[re.sub(r"[^\w\-]", "_", r[1])] = al[r[0]]
+    return out
 
 
 def main():

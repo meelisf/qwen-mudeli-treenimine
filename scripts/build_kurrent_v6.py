@@ -8,6 +8,8 @@ senatsprotokollides veerise `<m>…</m>`-ridadeks omal kohal (iga füüsiline ri
 omaette, VUTT ADR 0009; paigutus nagu v5 Leibnizil: peremeesploki ette esimese
 põhirea ette, mille keskpunkt on temast allpool).
 
+Allikad: Riksarkivet 7, senatsprotokolle, hanse XVI/XVII, kurrent-xix (xix_read_*); viimased
+kolm HF-ist uuesti scripts/fetch_raw_xml_v6.py-ga (ainult XML).
 Tuvastus: scripts/veeris_tuvastus.py (geomeetria; reeglid kasutaja kontrolliga 14.10).
 Reeglid (SÜMMEETRILISED — kasutaja 14.10: ühe poole eelistamine õpetaks teise poole
 veerise vahelejätmist):
@@ -16,6 +18,7 @@ veerise vahelejätmist):
   - muu ploki-sisene kandidaat (taandrida, ületäie rea sõna, tabelirida või päris
     veeris — ei erista) → KOGU LEHT VÄLJA, mõlemal pool;
   - kahe lehekülje laotus ühes regioonis → leht välja;
+  - veerise tekst > 0,5 põhiteksti pikkusest (rööptekst) või ≥ 15 veeriserida, > 40 % numbrid (tabel) → välja;
   - naaberlehe/dorsaali tekst → read GT-st välja (pildil näha, aga ei kuulu lehele;
     sama reegel mis VUTT Gemini juhises, PR #600).
 Tekst võetakse v5m GT-st REAINDEKSI järgi (makron, ſ→s jm v4/v5 teisendused jäävad);
@@ -25,7 +28,7 @@ Pildid hardlink-itud. Sisendkaustu ei muudeta. Holdout = v5m holdout miinus väl
 
   venv/bin/python scripts/build_kurrent_v6.py [--dry-run]
 """
-import csv, os, re, shutil, sys
+import csv, difflib, hashlib, os, re, shutil, sys
 from collections import Counter, defaultdict
 from datetime import datetime
 from pathlib import Path
@@ -62,6 +65,19 @@ def uus_tekst(a, gt_read):
     naaber = [r for r in regs if r["klass"] == "naaberleht"]
     if sees_muu:
         return None, "ploki_sees_kahtlane"
+    # Rööptekst (hanse17 237-0012/0013: teine veerg kordab põhiteksti). Ridade arv EI erista (rüütelkonna
+    # protokollide teemaveerud on 12–30 rida, päris veeris), sõnade/märkide kattuvus ka mitte (veeris kordab
+    # nimesid/märksõnu, 0,7–0,8). Eristab PIKKUS: rööptekst ~ põhiteksti pikkune (0,77–0,8), veeris ≤ ~0,45.
+    pikkus = lambda ts: sum(len(re.sub(r"\W", "", t)) for t in ts)
+    m_pikk = pikkus(t for r in veeris for t, _ in r["ridade_bbox"])
+    p_pikk = pikkus(t for r in plokid for t, _ in r["ridade_bbox"])
+    if m_pikk > 0.5 * max(p_pikk, 1):
+        return None, "rööptekst"
+    # Tabel (xix_read_1900 075047 metsatabelid): palju „veerist", enamus numbrid.
+    vread = [t for r in veeris for t, _ in r["ridade_bbox"]] + [None] * len(sees_num)
+    num = sum(1 for t in vread if t is None or NUMBER.fullmatch(t.replace("„", "").replace('"', "")))
+    if len(vread) >= 15 and num > 0.4 * len(vread):
+        return None, "tabel"
     if not veeris and not naaber and not sees_num:
         return gt_read, "muutmata"
     if len(xml_read) != len(gt_read):
@@ -110,7 +126,9 @@ def main():
         a = vt.analyysi(xs)
         if not a:
             continue
-        ks = [k for k in idx[allikas].get(vt.norm(a["tekst"])[:400], []) if k not in muudetud and k not in valja]
+        ks_koik = idx[allikas].get(vt.norm(a["tekst"])[:400], [])
+        nimed[allikas]["xml_seotud" if ks_koik else "xml_sidumata"] += 1
+        ks = [k for k in ks_koik if k not in muudetud and k not in valja]
         for k in ks:
             read, pohjus = uus_tekst(a, rows[k][1].split("\n"))
             nimed[allikas][pohjus] += 1
@@ -120,6 +138,35 @@ def main():
                 muudetud[k] = "\n".join(read)
     for k, t in muudetud.items():
         rows[k][1] = t
+    # Identse PILDIGA read (v5m: 142 gruppi / 437 rida, 14.10). Sama tekst → üks alles. Erinev tekst →
+    # KÕIK treeningliikmed välja: üks versioon on vigane (aaeb part-2 „…_4428135_…": „Mille 1134" vs
+    # „juillet 1579", „uyt" vs „vingt"), aga kumb, ei ole automaatselt otsustatav — lühim ei ole
+    # diplomaatiline. Holdouti liige jääb alati alles (treeningkaksik välja = leke kaob).
+    ho_nimed = {os.path.basename(l.strip().split("\t")[-1]) for l in open(BASE / "holdout.txt", encoding="utf-8")
+                if l.strip() and not l.startswith("#")}
+    grupid = defaultdict(list)
+    for k, r in enumerate(rows):
+        if k not in valja:
+            grupid[hashlib.md5((BASE / r[0]).read_bytes()).hexdigest()].append(k)
+    dup = Counter(); dup_naited = []
+    for ks in grupid.values():
+        if len(ks) < 2:
+            continue
+        t = [vt.norm(rows[k][1]) for k in ks]
+        sama = min(difflib.SequenceMatcher(None, t[0][:2000], x[:2000]).ratio() for x in t[1:]) > 0.95
+        ho = [k for k in ks if os.path.basename(rows[k][0]) in ho_nimed]
+        jaab = ho[0] if ho else (ks[0] if sama else None)
+        for k in ks:
+            if k != jaab and os.path.basename(rows[k][0]) not in ho_nimed:
+                valja.add(k); dup["sama_tekst" if sama else "erinev_tekst"] += 1
+        if not sama and len(dup_naited) < 4:
+            dup_naited.append([(os.path.basename(rows[k][0])[:30], "JÄÄB" if k == jaab else "välja",
+                                rows[k][1][:70].replace("\n", " / ")) for k in ks])
+    print(f"duplikaadid (identne pilt) välja: {dict(dup)}")
+    for n in dup_naited:
+        for x in n:
+            print("   ", x)
+        print()
     out = [r for k, r in enumerate(rows) if k not in valja]
     valja_nimed = {os.path.basename(rows[k][0]) for k in valja}
 
@@ -156,7 +203,8 @@ def main():
         + f"\nehitatud: {datetime.now():%Y-%m-%dT%H:%M:%S}  scripts/build_kurrent_v6.py\n"
         f"v5m {len(rows)} → {len(out)}  välja {len(valja)}, veeris <m>-iks {len(muudetud)} lehel; "
         f"{dict((a, dict(c)) for a, c in nimed.items())}  holdout −{len(ho_valja)}\n"
-        "PAGE XML veeris → <m> (Riksarkivet 7 + senatsprotokolle), tuvastus scripts/veeris_tuvastus.py\n",
+        "PAGE XML veeris → <m> (Riksarkivet 7, senatsprotokolle, hanse XVI/XVII, kurrent-xix), tuvastus scripts/veeris_tuvastus.py\n"
+        f"identse pildiga duplikaadid välja: {dict(dup)} (erinev tekst → kõik treeningliikmed välja)\n",
         encoding="utf-8")
     print(f"valmis: {NEW}  (holdout −{len(ho_valja)})")
 
