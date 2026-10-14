@@ -3,6 +3,10 @@
 Üks VUTT-i leht (Oesel m3do2t lk 3) mitme llama-serveri vastu + CER/WER.
 
   python scripts/oesel_proov.py vana=http://127.0.0.1:8091 uus=http://127.0.0.1:8092
+  python scripts/oesel_proov.py vana=http://127.0.0.1:8091 uus=http://127.0.0.1:8092@kurrent_v5
+
+`@kurrent_v5` = see mudel saab V5 juhise (<add>/<m>); vaikimisi KURRENT_INSTRUCTION.
+GT-s märgendeid ei ole, seega skoorimisel võetakse <m>/<add> maha (sisu jääb).
 
 Leht on telefonifoto, mitte skaneering, ja ei ole üheski treeningkomplektis —
 see on lähim, mis meil on „päris VUTT-i lehele" (holdout ei sisalda VUTT-i
@@ -35,7 +39,7 @@ from PIL import Image as PILImage
 
 sys.path.insert(0, str(Path(__file__).parent))
 from imaging import fit_to_grid
-from prompt import KURRENT_INSTRUCTION
+from prompt import KURRENT_INSTRUCTION, KURRENT_INSTRUCTION_V5
 from textmetrics import strip_output
 
 KAUST = Path("data/kurrent/oesel")
@@ -67,7 +71,7 @@ def wer(h, g):
     return editdistance.eval(h, g) / len(g)
 
 
-def saada(endpoint: str) -> str:
+def saada(endpoint: str, juhis: str) -> str:
     with PILImage.open(PILT) as im:
         pilt = fit_to_grid(im.convert("RGB"))
         buf = io.BytesIO()
@@ -76,7 +80,7 @@ def saada(endpoint: str) -> str:
     keha = json.dumps({
         "model": "kurrent",
         "messages": [{"role": "user", "content": [
-            {"type": "text", "text": KURRENT_INSTRUCTION},
+            {"type": "text", "text": juhis},
             {"type": "image_url", "image_url": {"url": uri}},
         ]}],
         "max_tokens": 4096,
@@ -100,10 +104,14 @@ OUT.mkdir(parents=True, exist_ok=True)
 valjundid = {}
 if VIIDE.exists():
     valjundid["viide 02.10 (vana)"] = VIIDE.read_text(encoding="utf-8")
+JUHISED = {"kurrent": KURRENT_INSTRUCTION, "kurrent_v5": KURRENT_INSTRUCTION_V5}
+margendeid = {}
 for nimi, endpoint in paarid:
-    tekst = saada(endpoint)
+    endpoint, _, juhis = endpoint.partition("@")
+    tekst = saada(endpoint, JUHISED[juhis or "kurrent"])
     (OUT / f"{nimi}.txt").write_text(tekst, encoding="utf-8")
-    valjundid[nimi] = tekst
+    margendeid[nimi] = len(re.findall(r"<(?:m|add)>", tekst))
+    valjundid[nimi] = re.sub(r"</?(?:m|add)>", "", tekst)
 
 print("\n| mudel | CER norm | CER toores | WER |")
 print("|---|---|---|---|")
@@ -120,4 +128,7 @@ for vale, oige in [("Osel", "Oesel"), ("Eresparre", "Ekesparre")]:
     muster = re.compile(r"\b" + vale + r"\b")
     rida = ", ".join(f"{n}: {len(muster.findall(t))}× {vale}" for n, t in valjundid.items())
     print(f"{oige}: {rida}")
+if any(margendeid.values()):
+    print("<m>/<add> märgendeid (skoorist maha võetud): "
+          + ", ".join(f"{n}: {k}" for n, k in margendeid.items()))
 print(f"\nVäljundid: {OUT}/")

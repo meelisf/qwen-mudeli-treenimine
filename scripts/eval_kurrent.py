@@ -66,6 +66,7 @@ import csv
 import io
 import json
 import os
+import re
 import sys
 import time
 import urllib.error
@@ -86,10 +87,16 @@ from lyhend_makron import makroniks
 
 csv.field_size_limit(10 ** 7)
 
-DATA_CSV     = Path("data/kurrent/metadata.csv")
-DATA_IMAGES  = Path("data/kurrent/images")
-HOLDOUT_PATH = Path("data/kurrent/holdout.txt")
-EVAL_ROOT    = Path("data/kurrent/eval")
+# --data-dir=<kaust>: v5 GT (märgenditega) elab data/kurrent_v5m-is; vaikimisi
+# vana data/kurrent, et varasemad jooksud ja nende eval-kaustad ei muutuks.
+DATA_DIR = Path("data/kurrent")
+for _a in sys.argv[1:]:
+    if _a.startswith("--data-dir="):
+        DATA_DIR = Path(_a.split("=", 1)[1])
+DATA_CSV     = DATA_DIR / "metadata.csv"
+DATA_IMAGES  = DATA_DIR / "images"
+HOLDOUT_PATH = DATA_DIR / "holdout.txt"
+EVAL_ROOT    = DATA_DIR / "eval"
 
 MODEL_PATH = "models/qwen3.5-ocr-kurrent-20260602"
 ENDPOINT = None    # llama.cpp server; siis MODEL_PATH on ainult väljundi nimi
@@ -271,14 +278,19 @@ def cer(ref: str, hyp: str) -> float:
     return editdistance.eval(ref, hyp) / len(ref)
 
 
+MARGENDID = re.compile(r"</?(?:m|add)>")
+
+
+def tagideta(text: str) -> str:
+    """<m>/<add> märgendid maha, sisu alles (vt CER-i arvutus)."""
+    return MARGENDID.sub("", text)
+
+
 def wer(ref: str, hyp: str) -> float:
     r, h = ref.split(), hyp.split()
     if not r:
         return 0.0 if not h else 1.0
     return editdistance.eval(r, h) / len(r)
-
-
-import re
 
 
 def strip_output(text: str) -> str:
@@ -449,14 +461,21 @@ for allikas, failinimi, hyp in rows:
     # Lühendusmärk tilde ≡ makron (VUTT ADR 0062): GT on alates v4-st makroniga,
     # vanemad mudelid kirjutavad tilde — muidu oleks CER-i erinevus kunstlik.
     # Pikk s ≡ s (06.10): GT on alates v4 pikk-s-ühtlustusest s-iga.
-    ref = makroniks(gt[failinimi].strip())[0].replace("ſ", "s")
-    hyp = makroniks(hyp)[0].replace("ſ", "s")
+    ref_raw = makroniks(gt[failinimi].strip())[0].replace("ſ", "s")
+    hyp_raw = makroniks(hyp)[0].replace("ſ", "s")
+    # cer/wer märgenditeta (sisu jääb): v4 mudel <m>/<add>-i ei kirjuta ja tema
+    # CER ei tohi selle pärast kasvada. Märgendid mõõdetakse eraldi loendina,
+    # cer_raw = märgenditega tekst (v5 vs v5 võrdluseks).
+    ref, hyp = tagideta(ref_raw), tagideta(hyp_raw)
     ratio = len(hyp) / max(len(ref), 1)
     tulemused.append({
         "failinimi": failinimi, "allikas": allikas,
         "gt_chars": len(ref), "out_chars": len(hyp),
         "ratio": round(ratio, 3),
         "cer": round(cer(ref, hyp), 4), "wer": round(wer(ref, hyp), 4),
+        "cer_raw": round(cer(ref_raw, hyp_raw), 4),
+        "gt_m": ref_raw.count("<m>"), "out_m": hyp_raw.count("<m>"),
+        "gt_add": ref_raw.count("<add>"), "out_add": hyp_raw.count("<add>"),
     })
 rows = tulemused
 

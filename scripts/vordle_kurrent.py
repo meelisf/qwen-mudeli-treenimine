@@ -26,8 +26,13 @@ import statistics
 import sys
 from pathlib import Path
 
-EVAL_ROOT = Path("data/kurrent/eval")
-HOLDOUT_PATH = Path("data/kurrent/holdout.txt")
+# --data-dir=<kaust> nagu eval_kurrent.py-s (v5: data/kurrent_v5m)
+DATA_DIR = Path("data/kurrent")
+for _a in sys.argv[1:]:
+    if _a.startswith("--data-dir="):
+        DATA_DIR = Path(_a.split("=", 1)[1])
+EVAL_ROOT = DATA_DIR / "eval"
+HOLDOUT_PATH = DATA_DIR / "holdout.txt"
 UUTE_MARKER = "# --- Lisatud 2026-10-02"
 LOOP_RATIO = 1.4
 
