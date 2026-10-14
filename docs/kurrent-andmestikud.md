@@ -719,7 +719,7 @@ VUTT-i oma lehtede parandamine.
 
 | kandidaat | seis | otsus |
 |---|---|---|
-| **Bullinger, käsitsi parandatud diplomaatiline alamkogu** (2025 uurimus, Subset 2: 50 lk / 49 kirja / 1 486 rida; read, poolitused, lühendid säilitatud) | artikli GitHubis alamkogu EI OLE | küsida autoritelt (Subset 2 + täislehepildid); kontrollida kattuvust meie Bullingeri treeningu/holdoutiga; kõik lehed ei pruugi olla ladina |
+| **Bullinger, käsitsi parandatud diplomaatiline alamkogu** (2025 uurimus, Subset 2: 50 lk / 49 kirja / 1 486 rida; read, poolitused, lühendid säilitatud) | arXiv 2508.07904 (Peer, Scius-Bertrand, Fischer; Fribourg). Repo andreas-fischer-unifr/nntp (MIT) sisaldab ainult joonduskoodi + näidisandmeid — alamkogu EI OLE (kontrollitud 14.10). Kontakt andreas.fischer@unifr.ch, marco.peer@unifr.ch. Subset 1 (50 lk) = normaliseeritud lõigud, EI sobi | küsida autoritelt (Subset 2 + täislehepildid); kontrollida kattuvust meie Bullingeri treeningu/holdoutiga; kõik lehed ei pruugi olla ladina |
 | **Gasparo Sardi „Toponomasia"** (1561–70, üks käsi, 49 ALTO, GT CC BY 4.0, diplomaatiline, read säilitatud) | pildid ainult küsides (README: Pauline Jacsont) | küsida pilte |
 | **Newton Project** (17. saj lõpp / 18. saj algus, diplomaatiline XML, `<lb>` alles, faksiimileviited; proov NATP00369: 105 `<lb>`) | tekst CC BY-NC-ND 3.0, märgenduses parandused/kustutused/valemid; sobivate lehtede arv teadmata | järgmine uurimissuund: litsents + ladina, vähe valemeid, pildiga kaetud lehed |
 | TRIDIS (HF `magistermilitum/Tridis`) | ladina keskaegne; 16. saj humanistlik = Bullinger (olemas), CODEA (hisp.) | ei |
