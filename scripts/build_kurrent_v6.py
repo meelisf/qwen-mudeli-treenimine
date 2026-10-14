@@ -47,6 +47,47 @@ def yk(bb):
     return (bb[1] + bb[3]) / 2 if bb else None
 
 
+LISAMARK = "+×#^‸÷/"
+ILN = Counter()
+ILN_LOG = []      # --iln-naited: (B uus tekst, L ja B bbox) visuaalseks kontrolliks
+
+
+def lisa_add(rida, lisad):
+    """Interlineaarsed lisandused rea B sisse <add>-ina (ADR 0067). lisad = [(tekst, x, (bx0, bx1), sõnade_x)].
+    Koht: Riksarkiveti sõnakoordinaadid (kui sõnu on sama palju kui GT-s), muidu x-i osakaal reast →
+    lähim sõnapiir. Kui lisandus algab lisamärgiga (või B-s on täpselt üks eraldiseisev märk) ja B-s on
+    sama märk eraldi sõnana, läheb ta märgi asemele. Valimis (30, 14.10) ~25 õiget; teadaolev viga:
+    eelmise rea ületäie sõna („werden dick / verrührt.") ja päiseread („a Parte / Praes. / a Parte")."""
+    tok = rida.split()
+    kohad = []
+    for t, x, (bx0, bx1), sonad in lisad:
+        mark = t[0] if t[0] in LISAMARK else None
+        t = t.lstrip(LISAMARK).strip()
+        if not mark:                                     # hanse „delen + dath": märk ainult B-s
+            margid = [w for w in tok if w and w in LISAMARK]
+            if len(margid) == 1:
+                mark = margid[0]
+        if mark and mark in tok:
+            k = tok.index(mark); tok[k] = None; kohad.append((k, x, t)); ILN["märgi_kohale"] += 1
+            continue
+        if sonad and len(sonad) == len(tok):
+            k = sum(1 for s in sonad if s < x); ILN["sõnakoord"] += 1
+        else:
+            siht = max(0.0, min(1.0, (x - bx0) / max(bx1 - bx0, 1))) * len(" ".join(w or "" for w in tok))
+            algused, pos = [], 0
+            for w in tok:
+                algused.append(pos); pos += len(w or "") + 1
+            algused.append(len(" ".join(w or "" for w in tok)))
+            k = min(range(len(algused)), key=lambda j: abs(algused[j] - siht)); ILN["osakaal"] += 1
+        kohad.append((k, x, t))
+    for k, _, t in sorted(kohad, reverse=True):
+        if k < len(tok) and tok[k] is None:
+            tok[k] = f"<add>{t}</add>"
+        else:
+            tok.insert(k, f"<add>{t}</add>")
+    return " ".join(w for w in tok if w is not None)
+
+
 def uus_tekst(a, gt_read):
     """(uued read | None, põhjus). a = vt.analyysi tulemus, gt_read = v5m GT read."""
     regs = a["regioonid"]
@@ -78,11 +119,29 @@ def uus_tekst(a, gt_read):
     num = sum(1 for t in vread if t is None or NUMBER.fullmatch(t.replace("„", "").replace('"', "")))
     if len(vread) >= 15 and num > 0.4 * len(vread):
         return None, "tabel"
-    if not veeris and not naaber and not sees_num:
+    # Interlineaarsed lisandused (svea 08342 „vices, / förrätta / så skall") → <add> alumise rea B sisse.
+    iln = {}
+    for blk in plokid:
+        kand, jaetud = vt.interlineaarsed(blk, a["ns"])
+        ILN["kahtlane_jäi_reaks"] += jaetud
+        for li, bi, x, bx, sonad in kand:
+            if (id(blk), li) not in sees_num and (id(blk), bi) not in sees_num:
+                iln[(id(blk), li)] = (bi, x, bx, sonad)
+    if not veeris and not naaber and not sees_num and not iln:
         return gt_read, "muutmata"
     if len(xml_read) != len(gt_read):
         return None, "ridade_arv_erineb"
     gt_of = {(id(r), i): gt_read[k] for k, (r, i) in enumerate(xml_read)}
+    b_lisad = defaultdict(list)
+    for (bid, li), (bi, x, bx, sonad) in iln.items():
+        b_lisad[(bid, bi)].append((gt_of[(bid, li)], x, bx, sonad))
+    for key, lisad in b_lisad.items():
+        if key in iln:                     # B on ise lisandus (ahel) — ei puutu
+            continue
+        gt_of[key] = lisa_add(gt_of[key], lisad); ILN["B_ridu"] += 1
+        blk = next(r for r in regs if id(r) == key[0])
+        ILN_LOG.append((gt_of[key], [blk["ridade_bbox"][key[1]][1]]
+                        + [blk["ridade_bbox"][li][1] for (bid, li), v in iln.items() if bid == key[0] and v[0] == key[1]]))
 
     # Põhiread lugemisjärjekorras regiooni kaupa; veerise read tõstetakse peremehe sisse.
     sisu = {}
@@ -90,7 +149,8 @@ def uus_tekst(a, gt_read):
         if r["klass"].startswith("veeris") or r["klass"] == "naaberleht":
             continue
         sisu[id(r)] = [(yk(bb), gt_of[(id(r), i)]) for i, (_, bb) in enumerate(r["ridade_bbox"])
-                       if (id(r), i) not in sees_num]
+                       if (id(r), i) not in sees_num
+                       and not ((id(r), i) in iln and (id(r), iln[(id(r), i)][0]) not in iln)]
     if not plokid:
         return None, "plokk_puudub"
 
@@ -109,6 +169,8 @@ def uus_tekst(a, gt_read):
         for i, (_, bb) in sorted(enumerate(m["ridade_bbox"]), key=lambda x: yk(x[1][1]) or 0):
             lisa(host, yk(bb), gt_of[(id(m), i)])
     read = [t for r in regs if id(r) in sisu for _, t in sisu[id(r)]]
+    if not veeris and not naaber and not sees_num:
+        return read, "interlineaar_add"
     return read, ("naaberleht_välja" if naaber and not veeris and not sees_num else "veeris_m")
 
 
@@ -130,7 +192,10 @@ def main():
         nimed[allikas]["xml_seotud" if ks_koik else "xml_sidumata"] += 1
         ks = [k for k in ks_koik if k not in muudetud and k not in valja]
         for k in ks:
+            n0 = len(ILN_LOG)
             read, pohjus = uus_tekst(a, rows[k][1].split("\n"))
+            for j in range(n0, len(ILN_LOG)):
+                ILN_LOG[j] = (rows[k][0], rows[k][2]) + ILN_LOG[j]
             nimed[allikas][pohjus] += 1
             if read is None:
                 valja.add(k)
@@ -174,6 +239,13 @@ def main():
     for al, c in sorted(nimed.items()):
         print(f"  {al:28s} {dict(c)}")
     mrd = Counter(r[2] for r in out for _ in range(r[1].count("<m>")))
+    print(f"interlineaar: {dict(ILN)}")
+    if "--iln-naited" in sys.argv:
+        import json, random
+        random.seed(2)
+        json.dump(random.sample(ILN_LOG, 30), open("/tmp/iln_naited.json", "w"), ensure_ascii=False)
+    ard = Counter(r[2] for r in out for _ in range(r[1].count("<add>")))
+    print(f"<add> allika kaupa: {dict(ard.most_common())}  kokku {sum(ard.values())}")
     print(f"<m>-ridu allika kaupa: {dict(mrd.most_common())}  kokku {sum(mrd.values())}")
     if DRY:
         for k in list(muudetud)[:3]:

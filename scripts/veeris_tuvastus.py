@@ -96,7 +96,7 @@ def analyysi(xml_str):
             if not bs:
                 continue
             b = (min(x[0] for x in bs), min(x[1] for x in bs), max(x[2] for x in bs), max(x[3] for x in bs))
-        info.append({"tyyp": tyyp(r), "bbox": b, "read": [l[0] for l in ls], "ridade_bbox": ls})
+        info.append({"tyyp": tyyp(r), "bbox": b, "read": [l[0] for l in ls], "ridade_bbox": ls, "el": r})
     if not info:
         return None
     tekst = "\n".join(l for r in info for l in r["read"])
@@ -175,8 +175,82 @@ def analyysi(xml_str):
     laotus_yhes = (any(blk.get("mitu_veergu") for blk in plokid)
                    or (bool(lehe_laius) and lehe_laius > lehe_korgus and len(plokid) == 1
                        and pw > 0.6 * lehe_laius))
-    return {"tekst": tekst, "regioonid": info, "laotus_yhes": laotus_yhes,
+    return {"tekst": tekst, "regioonid": info, "laotus_yhes": laotus_yhes, "ns": ns,
             "veeris_lugemisjarjekorras": [i for i, r in enumerate(info) if r["klass"].startswith("veeris")]}
+
+
+def _tekstiread(r_el, ns):
+    """Regiooni TextLine-elemendid SAMA filtriga mis read_lines (indeksid ühtivad ridade_bbox-iga)."""
+    out = []
+    for line in r_el.findall(f"{ns}TextLine"):
+        te = line.find(f"{ns}TextEquiv")
+        uc = te.find(f"{ns}Unicode") if te is not None else None
+        if uc is not None and uc.text and uc.text.strip():
+            out.append(line)
+    return out
+
+
+def _baasjoon(line, ns):
+    b = line.find(f"{ns}Baseline")
+    if b is not None and b.get("points"):
+        ys = [float(p.split(",")[1]) for p in b.get("points").split()]
+        return sum(ys) / len(ys)
+    bb = bbox(line, ns)
+    return bb[3] if bb else None
+
+
+ILN_NUMBER = re.compile(r"[\d\s.,:/§°o]{1,6}")
+
+
+def interlineaarsed(blk, ns):
+    """Ploki interlineaarsed lisandused (v6, 14.10): [(L_idx, B_idx, x_keskpunkt, B sõnade x-keskpunktid | None)].
+
+    L = lühike rida (< 0,5 ploki rea mediaanlaiusest), mille baasjoon on kahe JÄRJESTIKUSE põhirea A ja B
+    vahel (B−A < 1,4 × reasamm) ja mis kattub x-is mõlemaga; lisandus kuulub alumisse ritta B.
+    Juhuvalimis (24) 14 õiget / 8 vale — valed välja reeglitega: tsentreeritud pealkiri („VORTRAG / des"),
+    nimekiri/retsept (A, L, B algavad samast x-ist või kõik numbriga, „1 Ei"), number/ordinaal („1:o").
+    Tagastab ka vahele jäetud kandidaatide arvu (teine väärtus)."""
+    els = _tekstiread(blk["el"], ns)
+    L = []
+    for i, (el, (t, bb)) in enumerate(zip(els, blk["ridade_bbox"])):
+        y = _baasjoon(el, ns)
+        if bb and y is not None:
+            L.append(dict(i=i, t=t, x0=bb[0], x1=bb[2], y=y, el=el))
+    if len(L) < 4:
+        return [], 0
+    mw = sorted(l["x1"] - l["x0"] for l in L)[len(L) // 2]
+    pikad = sorted([l for l in L if l["x1"] - l["x0"] >= 0.6 * mw], key=lambda l: l["y"])
+    sammud = sorted(b["y"] - a["y"] for a, b in zip(pikad, pikad[1:]) if b["y"] > a["y"])
+    if len(pikad) < 3 or not sammud:
+        return [], 0
+    samm = sammud[len(sammud) // 2]
+    cx = lambda l: (l["x0"] + l["x1"]) / 2
+    kattub = lambda p, l: min(p["x1"], l["x1"]) - max(p["x0"], l["x0"]) > 0.5 * (l["x1"] - l["x0"])
+    out, jaetud = [], 0
+    for l in L:
+        if l["x1"] - l["x0"] >= 0.5 * mw:
+            continue
+        yle = [p for p in pikad if p["y"] < l["y"] - 0.15 * samm and kattub(p, l)]
+        alla = [p for p in pikad if p["y"] > l["y"] + 0.15 * samm and kattub(p, l)]
+        if not (yle and alla) or alla[0]["y"] - yle[-1]["y"] >= 1.4 * samm:
+            continue
+        a, b = yle[-1], alla[0]
+        tol = 0.05 * mw
+        if (ILN_NUMBER.fullmatch(l["t"])                                           # „1:o", „5"
+                or len(re.findall(r"[^\W\d_]", l["t"])) < 2                          # „╕" (senats): märk
+                or (abs(l["x0"] - a["x0"]) < tol and abs(l["x0"] - b["x0"]) < tol)  # nimekiri
+                or all(re.match(r"\s*\d", x["t"]) for x in (a, l, b))               # retsept, tabel
+                or (abs(cx(l) - cx(a)) < tol and abs(cx(a) - cx(b)) < 2 * tol)       # tsentreeritud pealkiri
+                or len(a["t"].split()) < 3 or len(b["t"].split()) < 3):              # pealkiri, aadress
+            jaetud += 1
+            continue
+        sonad = []
+        for w in b["el"].findall(f"{ns}Word"):
+            wb = bbox(w, ns)
+            if wb:
+                sonad.append((wb[0] + wb[2]) / 2)
+        out.append((l["i"], b["i"], cx(l), (b["x0"], b["x1"]), sorted(sonad) or None))
+    return out, jaetud
 
 
 def lipud(v):
