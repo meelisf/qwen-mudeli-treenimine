@@ -3,7 +3,7 @@
 
 Sisend data/vasar/klapitus.json (scripts/vasar_klapitus.py). Rea tekst:
   - Vasari lõik, kui rea CER ≤ 0,35; muidu mudeli (v5) rida — lipp kommentaari;
-  - rea lõpu poolitus (mudeli ¬) → ⸗ (VUTT-i käsikirjakonventsioon);
+  - rea lõpu poolitus (mudeli ¬) → - (käsikirjas ühekordne, kasutaja 15.10);
   - käsikirja „&": Vasar ja v5 kirjutavad enamasti „et"; kui mudel luges samas kohas „&", jääb „&".
 Vasteta / lühikesed lehed (tiitel, märkmed, tühi lk) jäetakse välja — nende VUTT-i tekst jääb puutumata.
 Väljund data/vasar/vasar_vutti.json: [{leht, nr, mudel, tekst, lipud: [{rida, pohjus, lehel, teine}]}].
@@ -43,12 +43,12 @@ def main():
             if seg is not None and cer <= TAU:
                 tekst = re.sub(r" {2,}", " ", taasta_ja(ocr, seg)).rstrip().rstrip("¬⸗=-")   # „vel [in] vita"
                 if poolitus:
-                    tekst += "⸗"
+                    tekst += "-"
                 if lip:
                     lipud.append(dict(rida=i, pohjus="Vasari joonealune (Msc.) / laiendus, mudel luges teisiti",
                                       lehel="Vasar", teine=ocr))
             else:
-                tekst = re.sub(r"[¬=]$", "⸗", ocr.rstrip())
+                tekst = re.sub(r"[¬=⸗]$", "-", ocr.rstrip())
                 lipud.append(dict(rida=i, pohjus=f"rida ei klapi (CER {cer:.2f})" if seg else "vasteta",
                                   lehel="OCR", teine=seg or ""))
             read.append(tekst)
