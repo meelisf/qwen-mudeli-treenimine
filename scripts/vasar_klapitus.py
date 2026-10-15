@@ -19,10 +19,15 @@ from joonda import joonda, lev, vrd, POOLITUS   # noqa: E402
 V = Path("data/vasar")
 JRK = "001 w99i7y euc1mm 003 004 005 006 nijmxt 03xao1 ao1wzt w7fej1 vcfr18 7u2ab3 q7fouq 8wrfj2 cnu9tl x52si6 ri7cuq wrzl8o nwyopw xzb6ai w366n3 sx7h30 07sizb 8rs33c 8rmcmn uu36ax t4cecc 65sayd vtb1mb 1cyqbg 25123k 66icu1 7etk59 h5y8f7 wpfud0 5agu0a 021 022".split()
 SUP = dict(zip("⁰¹²³⁴⁵⁶⁷⁸⁹", "0123456789"))
+SUP_R = {v: k for k, v in SUP.items()}
 MARK = "\x01"   # lipu ankur Vasari tekstis
 
 
 def vasari_leht(t):
+    # VUTT OCR märgib joonealuse märgi kolmel kujul (<fn>2)</fn>, <fn>4</fn>), <sup>2)</sup>) → ülaindeks;
+    # muud tägid (<i>β)</i>, <sup>tia</sup>, <cs>ψ</cs>) välja, sisu jääb
+    t = re.sub(r"<(fn|sup)>(\d{1,2})\)?</\1>\)?", lambda m: "".join(SUP_R[c] for c in m.group(2)) + ")", t)
+    t = re.sub(r"</?(?:fn|sup|i|b|cs)>", "", t)
     read = [re.sub(r"</?m>", "", r).replace("M.ꜰ", "M.te").rstrip() for r in t.split("\n")]
     while read and not read[-1].strip():
         read.pop()
@@ -32,6 +37,7 @@ def vasari_leht(t):
     # viimane „1)"-rida lehe teises pooles
     k = max((i for i, r in enumerate(read) if re.match(r"\s*1\)\s", r) and i > len(read) // 2), default=len(read))
     keha, jal = read[:k], " ".join(read[k:])
+    jal = re.sub(r"[¬-]\s+(?=[a-zæœ])", "", jal)            # „commis¬ surum"
     noot = {int(n): s.strip() for n, s in re.findall(r"(\d{1,2})\)\s*(.*?)(?=\s\d{1,2}\)\s|$)", jal)}
     t = ""
     for r in keha:
@@ -55,6 +61,7 @@ def vasari_leht(t):
     t = re.sub(r"(.*?)([¹²³⁴⁵⁶⁷⁸⁹⁰]+)\s?\)?", asenda, t)
     t = re.sub(r"\s\[[^\]]*\]", " " + MARK, t)              # toimetaja lisand [crebriores]
     t = re.sub(r"\[[^\]]*\]", MARK, t)                       # sõnasisene laiendus J[uris]
+    t = re.sub(r" +(?=[,.;:])", "", t)                         # „institutum ⁶)," → märgi eest jäänud tühik
     return re.sub(r" +", " ", t)
 
 
@@ -109,6 +116,20 @@ def main():
                 x = b + d
                 if 0 < x <= len(Rw) and (x == len(Rw) or Rw[x - 1] == " " or Rw[x] == " "):
                     loiked[li] = x; break
+        # reapiir sõna võrra: kui eelmise rea viimane / järgmise rea esimene sõna (nt „… eligendi et" |
+        # „& nominandi") klapib naaberreaga paremini, nihuta lõiget (poolitatud piiri ei puututa)
+        for li in range(1, len(read)):
+            if read[li - 1].rstrip()[-1:] in POOLITUS:
+                continue
+            a, b, c = loiked[li - 1], loiked[li], loiked[li + 1]
+            def hind(x):
+                return lev(read[li - 1].strip(), Rw[a:x].strip()) + lev(read[li].strip(), Rw[x:c].strip())
+            vasak = Rw.rfind(" ", a, max(a, b - 1))
+            parem = Rw.find(" ", min(b + 1, c), c)
+            kandidaadid = [x for x in (vasak, parem) if a < x < c]
+            parim = min(kandidaadid, key=hind, default=b)
+            if hind(parim) < hind(b):
+                loiked[li] = parim
         rr = []
         for li, rida in enumerate(read):
             a, b = alg + loiked[li], alg + loiked[li + 1]
