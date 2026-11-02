@@ -68,7 +68,10 @@ def test_kustos_enne_signatuuri():
 
 
 def test_juhised():
-    from prompt import INSTRUCTION, INSTRUCTION_CS
+    import prompt
+    from prompt import INSTRUCTION
+    from prompt_archive import INSTRUCTION_CS
+    assert not hasattr(prompt, "INSTRUCTION_CS")  # vana juhis ainult arhiivis
     assert "<f>text</f>" in INSTRUCTION and "<cs>" not in INSTRUCTION
     assert "<sig>A ij</sig>" in INSTRUCTION and "<catch>" in INSTRUCTION
     assert "as the LAST line" in INSTRUCTION

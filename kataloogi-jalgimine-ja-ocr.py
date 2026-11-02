@@ -33,7 +33,8 @@ from transformers import StoppingCriteria
 from unsloth import FastVisionModel
 from natsort import natsorted
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "scripts"))
-from prompt import INSTRUCTION, INSTRUCTION_CS, KURRENT_INSTRUCTION_V5  # noqa: F401
+from prompt import INSTRUCTION, KURRENT_INSTRUCTION_V5  # noqa: F401
+from prompt_archive import INSTRUCTION_CS  # vana <cs>-juhis kuni mudeli vahetuseni
 from imaging import MAX_PIXELS, fit_to_grid
 from loop_detect import is_looped
 
