@@ -34,7 +34,7 @@ Partii-režiim (prindi ainult):
 import re
 import sys
 from pathlib import Path
-from f_markup import canonicalize_style_tags
+from f_markup import canonicalize_page_mark_order, canonicalize_style_tags
 
 
 # Mitmerealisel <m>...</m> plokil on sisu üle mitme rea — eeltöötlus jagab need ühereallisteks.
@@ -454,6 +454,8 @@ def clean_markup(text: str, keep_marginalia_italics: bool = False) -> str:
         cleaned = strip_m_edge_whitespace(cleaned)
         # VUTT ADR 0077 p 5: servatühik välja, kõrvuti stiilipaarid kokku
         cleaned = canonicalize_style_tags(cleaned)
+        # Kustos enne signatuuri, signatuur viimane (prompt.py punkt 13)
+        cleaned = canonicalize_page_mark_order(cleaned)
         cleaned = remove_empty_m_tags(cleaned)
         cleaned = remove_empty_tags(cleaned)
         if cleaned == text:

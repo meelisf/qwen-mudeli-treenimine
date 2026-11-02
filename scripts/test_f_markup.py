@@ -10,7 +10,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from convert_marginalia import clean_markup  # noqa: E402
 from f_markup import (  # noqa: E402
-    canonicalize_style_tags, cs_to_f, f_f1, f_letter_share, hyphen_gate_violations,
+    canonicalize_page_mark_order, canonicalize_style_tags, cs_to_f, f_f1, f_letter_share, hyphen_gate_violations,
 )
 
 
@@ -50,10 +50,21 @@ def test_toimetaja_marge_jaab_valja():
     assert cs_to_f("[tühi lehekülg]", "F") == "[tühi lehekülg]"
 
 
+def test_kustos_enne_signatuuri():
+    assert canonicalize_page_mark_order("tekst\n<sig>C3</sig>\n<catch>Mul¬</catch>") == \
+        "tekst\n<catch>Mul¬</catch>\n<sig>C3</sig>"
+    assert canonicalize_page_mark_order("tekst\n<sig>B</sig> <catch>repe-</catch>\n") == \
+        "tekst\n<catch>repe-</catch>\n<sig>B</sig>\n"
+    ok = "tekst\n<catch>Vor⸗</catch>\n<sig>A ij</sig>"
+    assert canonicalize_page_mark_order(ok) == ok
+    assert canonicalize_page_mark_order("a <sig>B</sig>\n<catch>x</catch>") == "a <sig>B</sig>\n<catch>x</catch>"
+
+
 def test_juhised():
     from prompt import INSTRUCTION, INSTRUCTION_CS
     assert "<f>text</f>" in INSTRUCTION and "<cs>" not in INSTRUCTION
     assert "<sig>A ij</sig>" in INSTRUCTION and "<catch>" in INSTRUCTION
+    assert "as the LAST line" in INSTRUCTION
     # OCR-teenuse juhis jääb vanaks kuni mudeli vahetuseni
     assert "<cs>text</cs>" in INSTRUCTION_CS and "<sig>" not in INSTRUCTION_CS
 

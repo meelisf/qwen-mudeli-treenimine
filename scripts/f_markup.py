@@ -39,6 +39,32 @@ def canonicalize_style_tags(text: str) -> str:
     return text
 
 
+_ONLY_SIG = re.compile(r"^\s*<sig>.*?</sig>\s*$")
+_ONLY_CATCH = re.compile(r"^\s*<catch>.*?</catch>\s*$")
+_SIG_AND_CATCH = re.compile(r"^\s*(<sig>.*?</sig>)\s*(<catch>.*?</catch>)\s*$|^\s*(<catch>.*?</catch>)\s*(<sig>.*?</sig>)\s*$")
+
+
+def canonicalize_page_mark_order(text: str) -> str:
+    """Lehe lõpus: kustos eelviimasel real, signatuur VIIMASEL (kasutaja reegel 2026-11-02;
+    lehel on nad tihti ühel real). Puudutab ainult ridu, kus on ainult see täg —
+    ühel real olevad lahutatakse, vales järjekorras read vahetatakse."""
+    lines = (text or "").split("\n")
+    end = len(lines)
+    while end and not lines[end - 1].strip():
+        end -= 1
+    if not end:
+        return text
+    m = _SIG_AND_CATCH.match(lines[end - 1])
+    if m:
+        sig = m.group(1) or m.group(4)
+        catch = m.group(2) or m.group(3)
+        lines[end - 1:end] = [catch, sig]
+        end += 1
+    if end >= 2 and _ONLY_SIG.match(lines[end - 2]) and _ONLY_CATCH.match(lines[end - 1]):
+        lines[end - 2], lines[end - 1] = lines[end - 1].strip(), lines[end - 2].strip()
+    return "\n".join(lines)
+
+
 def hyphen_gate_violations(text: str) -> list:
     """Reanumbrid (1-põhised), kus rea lõpu poolitusmärk ja `<f>` ei klapi.
 

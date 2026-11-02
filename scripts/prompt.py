@@ -116,14 +116,13 @@ Instructions:
 12. Musical notation: if the page contains printed music (staves, notes), do not attempt
    to transcribe it – place a single <noodid> marker at that position and continue with
    the surrounding text.
-13. Page marks (the printed page apparatus, not text) – transcribe letter by letter
-    where they stand on the page:
-    - Signature (quire mark, e.g. A ij, B 3, )( 2): <sig>A ij</sig>
-    - Catchword (first word of the next page, bottom right): <catch>Vor⸗</catch>
-    - Page or folio number: <fw>265</fw>
-    - Running head: <rh>IOANNIS RAVLINII</rh>
-    A page mark may be inside <m>, never the other way round. A Fraktur catchword
-    is <catch><f>Vor⸗</f></catch>.
+13. Page marks (the printed page apparatus, not text), each on its own line, letter by letter:
+    - At the top, as the first line(s): page or folio number <fw>265</fw>, running head
+      <rh>IOANNIS RAVLINII</rh>.
+    - At the very end of the page: first the catchword (first word of the next page)
+      <catch>Vor⸗</catch>, then the signature (quire mark, e.g. A ij, B 3, )( 2)
+      <sig>A ij</sig> as the LAST line – also when both stand on one line on the page.
+    - A Fraktur catchword is <catch><f>Vor⸗</f></catch>.
 
 Blank pages: if the page has no text on it at all (blank leaf, blank verso, endpaper),
 return exactly this single line and nothing else:
