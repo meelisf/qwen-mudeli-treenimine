@@ -481,6 +481,9 @@ for failinimi, hyp in rows:
         "f_gt": ref.count("<f>"), "f_out": hyp_f.count("<f>"),
         "f_f1": round(f_f1(ref, hyp_f), 4),
         "cs_out": hyp.count("<cs>"),
+        # Lehe tähistus (VUTT ADR 0070): esimene treening, kus need on andmetes
+        **{f"{t}_{k}": x.count(f"<{t}>") for t in ("sig", "catch", "fw", "rh")
+           for k, x in (("gt", ref), ("out", hyp))},
     }
     kirje.update(marginaalid(ref, hyp))
     tulemused.append(kirje)
@@ -503,6 +506,9 @@ def keskmine(values):
 
 # <f> (VUTT ADR 0077): ainult lehed, kus GT-s või väljundis on <f>
 _f_rows = [r for r in rows if r["f_gt"] or r["f_out"]]
+print("Lehe tähistus (gt/väljund): " + ", ".join(
+    f"{t} {sum(r[t + '_gt'] for r in rows)}/{sum(r[t + '_out'] for r in rows)}"
+    for t in ("sig", "catch", "fw", "rh")))
 print(f"\n<f>-vahemike F1: {keskmine([r['f_f1'] for r in _f_rows]):.3f} "
       f"({len(_f_rows)} lehte; GT <f> kokku {sum(r['f_gt'] for r in rows)}, "
       f"väljund {sum(r['f_out'] for r in rows)}, teisendatud <cs> {sum(r['cs_out'] for r in rows)})")

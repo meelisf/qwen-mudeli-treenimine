@@ -50,6 +50,14 @@ def test_toimetaja_marge_jaab_valja():
     assert cs_to_f("[tühi lehekülg]", "F") == "[tühi lehekülg]"
 
 
+def test_juhised():
+    from prompt import INSTRUCTION, INSTRUCTION_CS
+    assert "<f>text</f>" in INSTRUCTION and "<cs>" not in INSTRUCTION
+    assert "<sig>A ij</sig>" in INSTRUCTION and "<catch>" in INSTRUCTION
+    # OCR-teenuse juhis jääb vanaks kuni mudeli vahetuseni
+    assert "<cs>text</cs>" in INSTRUCTION_CS and "<sig>" not in INSTRUCTION_CS
+
+
 def test_moodik():
     assert f_f1("a <f>Gott</f>", "a <f>Gott</f>") == 1.0
     assert f_f1("a b", "a b") == 1.0
