@@ -83,6 +83,7 @@ from convert_marginalia import clean_markup
 from imaging import MAX_PIXELS, fit_to_grid
 from lyhend_makron import makroniks
 from prompt import INSTRUCTION
+from f_markup import cs_to_f, f_f1, f_letter_share
 
 csv.field_size_limit(10 ** 7)
 
@@ -465,6 +466,7 @@ for failinimi, hyp in rows:
     # Lühendusmärk tilde ≡ makron (VUTT ADR 0062): GT on makroniga, vanemad
     # mudelid kirjutavad tilde — muidu oleks CER-i erinevus kunstlik.
     ref, hyp = makroniks(gt[failinimi])[0], makroniks(hyp)[0]
+    hyp_f = cs_to_f(hyp, "F" if f_letter_share(ref) > 0.5 else "A") if "<cs>" in hyp else hyp
     kirje = {
         "failinimi": failinimi,
         "kiht": kiht(ref),
@@ -474,7 +476,11 @@ for failinimi, hyp in rows:
         "wer": round(wer(ref, hyp), 4),
         "cer_plain": round(cer(strip_tags(ref), strip_tags(hyp)), 4),
         "i_gt": ref.count("<i>"), "i_out": hyp.count("<i>"),
-        "cs_gt": ref.count("<cs>"), "cs_out": hyp.count("<cs>"),
+        # <f> (VUTT ADR 0077). Vana mudel kirjutab suhtelist <cs>-i: teisendus
+        # lehe põhikirjaga GT-st (fraktuuritähtede enamus), et võrdlus oleks aus.
+        "f_gt": ref.count("<f>"), "f_out": hyp_f.count("<f>"),
+        "f_f1": round(f_f1(ref, hyp_f), 4),
+        "cs_out": hyp.count("<cs>"),
     }
     kirje.update(marginaalid(ref, hyp))
     tulemused.append(kirje)
@@ -493,6 +499,13 @@ with open(results_csv, "w", encoding="utf-8", newline="") as f:
 
 def keskmine(values):
     return sum(values) / len(values) if values else float("nan")
+
+
+# <f> (VUTT ADR 0077): ainult lehed, kus GT-s või väljundis on <f>
+_f_rows = [r for r in rows if r["f_gt"] or r["f_out"]]
+print(f"\n<f>-vahemike F1: {keskmine([r['f_f1'] for r in _f_rows]):.3f} "
+      f"({len(_f_rows)} lehte; GT <f> kokku {sum(r['f_gt'] for r in rows)}, "
+      f"väljund {sum(r['f_out'] for r in rows)}, teisendatud <cs> {sum(r['cs_out'] for r in rows)})")
 
 
 print(f"\n{'kiht':18s} {'lk':>3s} {'CER':>7s} {'CERtxt':>7s} {'ratio':>6s} "

@@ -1,0 +1,3 @@
+# VUTT ADR 0077 poolitusvärava kontrollitud erandid: üks `teos/lehe_tüvi` rea kohta.
+# Lisa ainult pildilt kontrollitud leht (nt trükikoda kasutas fraktuuris ühekordset -).
+# Formaat: 1626-neun-ausserlesen-...-lzogr0/…-017   # põhjus

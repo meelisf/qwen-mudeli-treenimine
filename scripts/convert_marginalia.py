@@ -34,6 +34,7 @@ Partii-režiim (prindi ainult):
 import re
 import sys
 from pathlib import Path
+from f_markup import canonicalize_style_tags
 
 
 # Mitmerealisel <m>...</m> plokil on sisu üle mitme rea — eeltöötlus jagab need ühereallisteks.
@@ -85,7 +86,7 @@ def normalize_multiline_m_tags(text: str) -> str:
 # Tuvastab kõik eraldi-rea marginaalide variandid
 _M_LINE_RE = re.compile(
     r"^"
-    r"(?:<cs>)?"
+    r"(?:<f>)?"
     r"(?P<outer_fmt><[ib]>)?"
     r"<m>"
     r"(?P<inner_fmt><[ib]>)?"
@@ -93,7 +94,7 @@ _M_LINE_RE = re.compile(
     r"(?:</[ib]>)?"
     r"</m>"
     r"(?:</[ib]>)?"
-    r"(?:</cs>)?"
+    r"(?:</f>)?"
     r"$",
     re.DOTALL,
 )
@@ -176,8 +177,8 @@ def convert(text: str) -> str:
     return "".join(result_parts)
 
 
-_M_EDGE_WS_START = re.compile(r"^(\s*<m>(?:<(?:i|b|cs|hi)>)*)[ \t]+", re.MULTILINE)
-_M_EDGE_WS_END = re.compile(r"[ \t]+((?:</(?:i|b|cs|hi)>)*</m>\s*)$", re.MULTILINE)
+_M_EDGE_WS_START = re.compile(r"^(\s*<m>(?:<(?:i|b|f|hi)>)*)[ \t]+", re.MULTILINE)
+_M_EDGE_WS_END = re.compile(r"[ \t]+((?:</(?:i|b|f|hi)>)*</m>\s*)$", re.MULTILINE)
 
 
 def strip_m_edge_whitespace(text: str) -> str:
@@ -218,7 +219,7 @@ def remove_empty_m_tags(text: str) -> str:
 #: Tagid, mis VUTT-ist tulevad, aga ei kuulu treeningjuhisesse (prompt.py).
 #: Sisu on päris lehetekst (käsikirjalised parandused trükitud lehel), seega
 #: eemaldatakse ainult märgend ise, sisu jääb alles. Ühtlasi parandab see
-#: katkise pesastuse: just <annN> on see, mis lõikub üle <i>/<cs>/<m> piiride.
+#: katkise pesastuse: just <annN> on see, mis lõikub üle <i>/<f>/<m> piiride.
 UNWRAP_TAGS = ("ann1", "ann2", "ann3", "ann4")
 
 #: Sama, aga numbrist sõltumatult. VUTT-i varukoopias on ka ann5–ann14
@@ -257,7 +258,7 @@ def fix_crossed_tags(text: str) -> str:
     märgend suletakse vales järjekorras – eriti poolitatud sõnades ja
     marginaaliaridades:
 
-        <i>L. Baro in <cs>Ekeby⸗</i></cs>   →  <i>L. Baro in <cs>Ekeby⸗</cs></i>
+        <i>L. Baro in <f>Ekeby⸗</i></f>   →  <i>L. Baro in <f>Ekeby⸗</f></i>
         <m><i>traria.</m></i>               →  <m><i>traria.</i></m>
 
     Kui sulgeja vastab mõnele pinus allpool olevale avajale, suletakse kõik
@@ -305,7 +306,7 @@ def balance_line_m_tags(text: str) -> str:
 
     Pärast mitmerealiste plokkide jagamist peab iga `<m>` paar asuma ühel
     real. See lubab parandada kasutaja sisestuse nagu `<i>Ratio.</i></m>` ilma
-    leheküljepiiri ületavaid `<i>`/`<cs>` märgendeid puutumata.
+    leheküljepiiri ületavaid `<i>`/`<f>` märgendeid puutumata.
     """
     result = []
     for line in text.split("\n"):
@@ -357,7 +358,7 @@ def flatten_redundant_nested_tags(text: str) -> str:
 
 
 def remove_empty_tags(text: str) -> str:
-    """Eemaldab sisuta märgendipaarid (<i></i>, <cs></cs>, <m><i></i></m> …).
+    """Eemaldab sisuta märgendipaarid (<i></i>, <f></f>, <m><i></i></m> …).
 
     Korratakse püsipunktini, et ka pesastatud tühjad plokid kaoksid.
     <pb/> ja <noodid> jäävad puutumata – neil pole paarilist.
@@ -451,6 +452,8 @@ def clean_markup(text: str, keep_marginalia_italics: bool = False) -> str:
         if not keep_marginalia_italics:
             cleaned = strip_italics_in_marginalia(cleaned)
         cleaned = strip_m_edge_whitespace(cleaned)
+        # VUTT ADR 0077 p 5: servatühik välja, kõrvuti stiilipaarid kokku
+        cleaned = canonicalize_style_tags(cleaned)
         cleaned = remove_empty_m_tags(cleaned)
         cleaned = remove_empty_tags(cleaned)
         if cleaned == text:

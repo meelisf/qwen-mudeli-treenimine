@@ -33,7 +33,7 @@ from transformers import StoppingCriteria
 from unsloth import FastVisionModel
 from natsort import natsorted
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "scripts"))
-from prompt import INSTRUCTION, KURRENT_INSTRUCTION_V5
+from prompt import INSTRUCTION, INSTRUCTION_CS, KURRENT_INSTRUCTION_V5  # noqa: F401
 from imaging import MAX_PIXELS, fit_to_grid
 from loop_detect import is_looped
 
@@ -277,7 +277,10 @@ def ensure_model(model_type: str):
 #: erineb ainult p 7 poolest — `<add>` lisamiskohas (VUTT ADR 0067) ja veeris
 #: `<m>`-ridadena. Mudel ja juhis vahetuvad KOOS (llama-server-hand.service).
 INSTRUCTIONS = {
-    "print": INSTRUCTION,
+    # VUTT ADR 0077: vana trükimudel on treenitud suhtelise <cs>-iga. Vaheta
+    # INSTRUCTION-i (absoluutne <f>) peale SAMAL ajal uue mudeliga; VUTT-is samal
+    # ajal config.OCR_OUTPUT_RELATIVE_CS = False ja Gemini trükijuhis <f>-ile.
+    "print": INSTRUCTION_CS,
     "hand":  KURRENT_INSTRUCTION_V5,
 }
 
