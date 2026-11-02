@@ -58,6 +58,13 @@ def test_kustos_enne_signatuuri():
     ok = "tekst\n<catch>Vor⸗</catch>\n<sig>A ij</sig>"
     assert canonicalize_page_mark_order(ok) == ok
     assert canonicalize_page_mark_order("a <sig>B</sig>\n<catch>x</catch>") == "a <sig>B</sig>\n<catch>x</catch>"
+    # ühel real (04na2fu4 lk 49)
+    assert canonicalize_page_mark_order("tekst\n<sig>G</sig>  <catch>Mittel</catch>") == \
+        "tekst\n<catch>Mittel</catch>\n<sig>G</sig>"
+    # topeltlehekülg: iga <pb/> osa eraldi; tägirida (<i>) enne <pb/>-d jäetakse vahele
+    t = "a\n<sig>B</sig>\n<catch>Vor</catch>\n<i>\n<pb/>\nb</i>\n<sig>C</sig>\n<catch>x</catch>"
+    assert canonicalize_page_mark_order(t) == \
+        "a\n<catch>Vor</catch>\n<sig>B</sig>\n<i>\n<pb/>\nb</i>\n<catch>x</catch>\n<sig>C</sig>"
 
 
 def test_juhised():

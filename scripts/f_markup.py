@@ -44,25 +44,42 @@ _ONLY_CATCH = re.compile(r"^\s*<catch>.*?</catch>\s*$")
 _SIG_AND_CATCH = re.compile(r"^\s*(<sig>.*?</sig>)\s*(<catch>.*?</catch>)\s*$|^\s*(<catch>.*?</catch>)\s*(<sig>.*?</sig>)\s*$")
 
 
-def canonicalize_page_mark_order(text: str) -> str:
-    """Lehe lõpus: kustos eelviimasel real, signatuur VIIMASEL (kasutaja reegel 2026-11-02;
-    lehel on nad tihti ühel real). Puudutab ainult ridu, kus on ainult see täg —
-    ühel real olevad lahutatakse, vales järjekorras read vahetatakse."""
-    lines = (text or "").split("\n")
-    end = len(lines)
-    while end and not lines[end - 1].strip():
-        end -= 1
-    if not end:
-        return text
-    m = _SIG_AND_CATCH.match(lines[end - 1])
+_TAG_ONLY_RE = re.compile(r"</?[a-z]+\d*/?>")
+
+
+def _is_content(line: str) -> bool:
+    """Rida, millel on teksti (mitte tühi ega ainult tägid nagu `<i>` enne `<pb/>`-d)."""
+    return bool(_TAG_ONLY_RE.sub("", line).strip())
+
+
+def _canon_segment(seg: str) -> str:
+    lines = seg.split("\n")
+    idx = [i for i, ln in enumerate(lines) if _is_content(ln)]
+    if not idx:
+        return seg
+    last = idx[-1]
+    m = _SIG_AND_CATCH.match(lines[last])
     if m:
         sig = m.group(1) or m.group(4)
         catch = m.group(2) or m.group(3)
-        lines[end - 1:end] = [catch, sig]
-        end += 1
-    if end >= 2 and _ONLY_SIG.match(lines[end - 2]) and _ONLY_CATCH.match(lines[end - 1]):
-        lines[end - 2], lines[end - 1] = lines[end - 1].strip(), lines[end - 2].strip()
+        lines[last:last + 1] = [catch, sig]
+        return "\n".join(lines)
+    if len(idx) >= 2:
+        prev = idx[-2]
+        if _ONLY_SIG.match(lines[prev]) and _ONLY_CATCH.match(lines[last]):
+            lines[prev], lines[last] = lines[last].strip(), lines[prev].strip()
     return "\n".join(lines)
+
+
+def canonicalize_page_mark_order(text: str) -> str:
+    """Iga füüsilise lehe (`<pb/>` vahel) lõpus: kustos eelviimasel sisulisel real,
+    signatuur VIIMASEL (kasutaja reegel 2026-11-02; lehel on nad tihti ühel real).
+    Puudutab ainult ridu, kus on ainult need tägid — ühel real olevad lahutatakse,
+    vales järjekorras read vahetatakse. Ainult tägidest koosnev rida (nt `<i>`, mis
+    jätkub pärast `<pb/>`-d) jäetakse vahele."""
+    if not text or ("<sig>" not in text and "<catch>" not in text):
+        return text
+    return "<pb/>".join(_canon_segment(seg) for seg in text.split("<pb/>"))
 
 
 def hyphen_gate_violations(text: str) -> list:
