@@ -46,6 +46,10 @@ def test_cs_to_f_peegel():
         "<f>sich bey den</f> exercitiis <f>finden</f>"
 
 
+def test_toimetaja_marge_jaab_valja():
+    assert cs_to_f("[tühi lehekülg]", "F") == "[tühi lehekülg]"
+
+
 def test_moodik():
     assert f_f1("a <f>Gott</f>", "a <f>Gott</f>") == 1.0
     assert f_f1("a b", "a b") == 1.0
