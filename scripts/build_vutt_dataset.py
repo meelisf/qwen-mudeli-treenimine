@@ -31,6 +31,7 @@ from datetime import datetime
 from pathlib import Path
 
 from convert_marginalia import clean_markup
+from f_markup import hyphen_gate_violations, load_exceptions
 from imaging import prepare_image, MAX_PIXELS
 from lyhend_makron_trukk import puhasta
 from prompt import EMPTY_PAGE_MARKER
@@ -314,6 +315,11 @@ def main():
     sparse_pages = []       # vähese tekstiga lehed (nt ainult lk number)
     bad_empty = []          # tühjaks mõeldud, aga vales vormis
     mixed_empty = []        # märgend koos muu tekstiga
+    # VUTT ADR 0077 p 4: rea lõpu ⸗ peab olema <f>-i sees ja - väljas. Kontrollitud
+    # erandid (trükikoda kasutas fraktuuris päriselt ühekordset -) failis
+    # data/f_poolitus_erandid.txt, üks `teos/lehe_tüvi` rea kohta.
+    hyphen_exceptions = load_exceptions(Path("data/f_poolitus_erandid.txt"))
+    hyphen_flagged = []     # (page_id, reanumbrid) — jäid välja
 
     works = sorted(
         d for d in RAW_DIR.iterdir()
@@ -400,6 +406,12 @@ def main():
                 skipped_empty += 1
                 continue
 
+            # Poolitusmärgi värav (ADR 0077 p 4) — iga ekspordiga, mitte ainult migratsioonil
+            gate = hyphen_gate_violations(transcription)
+            if gate and f"{work_dir.name}/{base}" not in hyphen_exceptions:
+                hyphen_flagged.append((f"{work_dir.name}/{base}", gate))
+                continue
+
             # Tühja lehekülje märgendi kontroll
             kind = empty_marker_kind(transcription)
             page_id = f"{work_dir.name}/{base}"
@@ -472,6 +484,23 @@ def main():
     if not sparse_pages and MAX_CHARS is None:
         print(f"        (mudel ei näe ühtegi näidet hõredast lehest – "
               f"vt SPIKKER.md)")
+
+    if hyphen_flagged:
+        flag_csv = OUT_DIR / "f_poolitus_lipud.csv"
+        flag_csv.parent.mkdir(parents=True, exist_ok=True)
+        with open(flag_csv, "w", encoding="utf-8", newline="") as fh:
+            w = csv.writer(fh)
+            w.writerow(["leht", "read"])
+            for pid, rows_ in hyphen_flagged:
+                w.writerow([pid, " ".join(map(str, rows_))])
+        print(f"\n  !! {len(hyphen_flagged)} lehel ei klapi rea lõpu poolitusmärk ja <f> "
+              f"(⸗ väljas / - sees) – jäid välja (ADR 0077).")
+        print(f"     Paranda VUTT-is või lisa kontrollitud erand data/f_poolitus_erandid.txt. "
+              f"Nimekiri: {flag_csv}")
+        for pid, rows_ in hyphen_flagged[:10]:
+            print(f"        {pid}: read {rows_[:5]}")
+        if len(hyphen_flagged) > 10:
+            print(f"        ... ja veel {len(hyphen_flagged) - 10}")
 
     if bad_empty:
         print(f"\n  !! {len(bad_empty)} lehte on tühjaks märgitud VALES VORMIS "
