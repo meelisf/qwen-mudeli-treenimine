@@ -1,0 +1,50 @@
+diff -ru a/kataloogi-jalgimine-ja-ocr.py b/kataloogi-jalgimine-ja-ocr.py
+--- a/kataloogi-jalgimine-ja-ocr.py	2026-11-03 02:18:50.953542840 +0200
++++ b/kataloogi-jalgimine-ja-ocr.py	2026-11-03 02:18:50.980953640 +0200
+@@ -34,7 +34,6 @@
+ from natsort import natsorted
+ sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "scripts"))
+ from prompt import INSTRUCTION, KURRENT_INSTRUCTION_V5  # noqa: F401
+-from prompt_archive import INSTRUCTION_CS  # vana <cs>-juhis kuni mudeli vahetuseni
+ from imaging import MAX_PIXELS, fit_to_grid
+ from loop_detect import is_looped
+ 
+@@ -83,7 +82,7 @@
+ 
+ # Iga tüübi jaoks eraldi alamkaust ja mudel
+ MODEL_CONFIGS = {
+-    "print": "models/qwen3.5-ocr-print-base-r64-mi-vl-20260828",
++    "print": "models/qwen3.5-ocr-print-base-r64-mi-vl-20261102",
+     "hand":  "models/qwen3.5-ocr-kurrent-20260829",
+ }
+ 
+@@ -278,10 +277,11 @@
+ #: erineb ainult p 7 poolest — `<add>` lisamiskohas (VUTT ADR 0067) ja veeris
+ #: `<m>`-ridadena. Mudel ja juhis vahetuvad KOOS (llama-server-hand.service).
+ INSTRUCTIONS = {
+-    # VUTT ADR 0077: vana trükimudel on treenitud suhtelise <cs>-iga. Vaheta
+-    # INSTRUCTION-i (absoluutne <f>) peale SAMAL ajal uue mudeliga; VUTT-is samal
+-    # ajal config.OCR_OUTPUT_RELATIVE_CS = False ja Gemini trükijuhis <f>-ile.
+-    "print": INSTRUCTION_CS,
++    # VUTT ADR 0077: alates trükimudelist print-base-r64-mi-vl-20261102 absoluutne
++    # <f> (INSTRUCTION). Mudel ja juhis vahetuvad KOOS (llama-server-print.service);
++    # vana <cs>-juhis on scripts/prompt_archive.py-s. VUTT-is samal ajal
++    # config.OCR_OUTPUT_RELATIVE_CS = False.
++    "print": INSTRUCTION,
+     "hand":  KURRENT_INSTRUCTION_V5,
+ }
+ 
+diff -ru a/systemd/llama-server-print.service b/systemd/llama-server-print.service
+--- a/systemd/llama-server-print.service	2026-11-03 02:18:50.956542978 +0200
++++ b/systemd/llama-server-print.service	2026-11-03 02:18:50.960472530 +0200
+@@ -16,8 +16,8 @@
+ # -c 65536 jaguneb slottide vahel: -np 4 annab 16384 tokenit slotile.
+ # Leht vajab ~5000 visuaal + kuni 4096 väljund.
+ ExecStart=/home/mf/Dokumendid/LLM/llama.cpp/build/bin/llama-server \
+-    -m /home/mf/Dokumendid/LLM/qwen3.5/models/gguf/print-base-r64-mi-vl-20261006-Q8_0.gguf \
+-    --mmproj /home/mf/Dokumendid/LLM/qwen3.5/models/gguf/mmproj-print-base-r64-mi-vl-20261006-F16.gguf \
++    -m /home/mf/Dokumendid/LLM/qwen3.5/models/gguf/print-base-r64-mi-vl-20261102-Q8_0.gguf \
++    --mmproj /home/mf/Dokumendid/LLM/qwen3.5/models/gguf/mmproj-print-base-r64-mi-vl-20261102-F16.gguf \
+     --image-max-tokens 5000 \
+     -ngl 99 -c 65536 -np 4 -cb -fa on \
+     --host 127.0.0.1 --port 8080
