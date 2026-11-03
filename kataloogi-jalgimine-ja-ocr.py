@@ -34,7 +34,6 @@ from unsloth import FastVisionModel
 from natsort import natsorted
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "scripts"))
 from prompt import INSTRUCTION, KURRENT_INSTRUCTION_V5  # noqa: F401
-from prompt_archive import INSTRUCTION_CS  # vana <cs>-juhis kuni mudeli vahetuseni
 from imaging import MAX_PIXELS, fit_to_grid
 from loop_detect import is_looped
 
@@ -83,7 +82,7 @@ BASE_OCR_KAUST = "/home/mf/Dokumendid/LLM/AUTO-OCR"
 
 # Iga tüübi jaoks eraldi alamkaust ja mudel
 MODEL_CONFIGS = {
-    "print": "models/qwen3.5-ocr-print-base-r64-mi-vl-20260828",
+    "print": "models/qwen3.5-ocr-print-base-r64-mi-vl-20261102",
     "hand":  "models/qwen3.5-ocr-kurrent-20260829",
 }
 
@@ -278,10 +277,11 @@ def ensure_model(model_type: str):
 #: erineb ainult p 7 poolest — `<add>` lisamiskohas (VUTT ADR 0067) ja veeris
 #: `<m>`-ridadena. Mudel ja juhis vahetuvad KOOS (llama-server-hand.service).
 INSTRUCTIONS = {
-    # VUTT ADR 0077: vana trükimudel on treenitud suhtelise <cs>-iga. Vaheta
-    # INSTRUCTION-i (absoluutne <f>) peale SAMAL ajal uue mudeliga; VUTT-is samal
-    # ajal config.OCR_OUTPUT_RELATIVE_CS = False ja Gemini trükijuhis <f>-ile.
-    "print": INSTRUCTION_CS,
+    # VUTT ADR 0077: alates trükimudelist print-base-r64-mi-vl-20261102 absoluutne
+    # <f> (INSTRUCTION). Mudel ja juhis vahetuvad KOOS (llama-server-print.service);
+    # vana <cs>-juhis on scripts/prompt_archive.py-s. VUTT-is samal ajal
+    # config.OCR_OUTPUT_RELATIVE_CS = False.
+    "print": INSTRUCTION,
     "hand":  KURRENT_INSTRUCTION_V5,
 }
 
